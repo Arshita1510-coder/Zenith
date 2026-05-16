@@ -14,7 +14,7 @@ function paginate(rows, page = 1, pageSize = 25) {
 
 auditRouter.get("/", requireAuth, requireRole("Admin"), async (req, res) => {
   try {
-    const { from, to, employeeId, page, pageSize } = req.query;
+    const { from, to, employeeId, employeeName, page, pageSize } = req.query;
     const logs = await prisma.auditLog.findMany({
       where: {
         changedAt: {
@@ -38,7 +38,7 @@ auditRouter.get("/", requireAuth, requireRole("Admin"), async (req, res) => {
         newValue: log.newValue || "",
         description: log.changeDescription
       }))
-      .filter((row) => !employeeId || row.employeeId === employeeId);
+      .filter((row) => (!employeeId || row.employeeId === employeeId) && (!employeeName || row.employeeName?.toLowerCase().includes(String(employeeName).toLowerCase())));
     return res.json(paginate(rows, page, pageSize));
   } catch {
     const rows = demoStore.getAuditLogs(req.query).map((log) => ({

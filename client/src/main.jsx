@@ -838,7 +838,7 @@ function CompletionDashboard({ currentUser, managerOnly = false }) {
 }
 
 function AuditLogPage() {
-  const [filters, setFilters] = useState({ from: "", to: "", employeeId: "" });
+  const [filters, setFilters] = useState({ from: "", to: "", employeeName: "" });
   const [data, setData] = useState({ rows: [], total: 0, page: 1, pageSize: 10 });
   const [message, setMessage] = useState("");
 
@@ -867,7 +867,7 @@ function AuditLogPage() {
       <div className="mb-5 grid gap-3 rounded-lg border border-[#dce4d8] bg-white p-4 md:grid-cols-4">
         <Input label="From" type="date" value={filters.from} onChange={(value) => setFilters((current) => ({ ...current, from: value }))} />
         <Input label="To" type="date" value={filters.to} onChange={(value) => setFilters((current) => ({ ...current, to: value }))} />
-        <Input label="Employee ID" value={filters.employeeId} onChange={(value) => setFilters((current) => ({ ...current, employeeId: value }))} />
+        <Input label="Employee name" value={filters.employeeName} onChange={(value) => setFilters((current) => ({ ...current, employeeName: value }))} />
         <div className="flex items-end">
           <button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={() => downloadBlob("zenith-audit-log.csv", rowsToCsv(rows), "text/csv;charset=utf-8")} type="button">
             <Download size={16} /> Export CSV

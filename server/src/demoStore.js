@@ -319,6 +319,25 @@ export const demoStore = {
     return goal;
   },
 
+  editGoal(goalId, updates, changedBy) {
+    const goal = goals.find((item) => item.id === goalId);
+    if (!goal) return null;
+    ["target", "weightage"].forEach((field) => {
+      if (updates[field] !== undefined && String(updates[field]) !== String(goal[field])) {
+        addAuditLog({
+          changedBy,
+          goalId,
+          fieldChanged: field,
+          oldValue: goal[field],
+          newValue: updates[field],
+          changeDescription: `Manager edited ${field} during approval`
+        });
+        goal[field] = field === "weightage" ? Number(updates[field]) : String(updates[field]);
+      }
+    });
+    return goal;
+  },
+
   getAchievements(employeeId, quarter) {
     const dashboard = dashboardForEmployee(employeeId, quarter);
     return dashboard ? dashboard.goals : [];
@@ -384,10 +403,15 @@ export const demoStore = {
     return { summaryCards, employeeRows, managerRows };
   },
 
-  getAuditLogs({ from, to, employeeId } = {}) {
+  getAuditLogs({ from, to, employeeId, employeeName } = {}) {
     return auditLogs.filter((log) => {
       const timestamp = new Date(log.changedAt).getTime();
-      return (!from || timestamp >= new Date(from).getTime()) && (!to || timestamp <= new Date(to).getTime()) && (!employeeId || log.employeeId === employeeId);
+      return (
+        (!from || timestamp >= new Date(from).getTime()) &&
+        (!to || timestamp <= new Date(to).getTime()) &&
+        (!employeeId || log.employeeId === employeeId) &&
+        (!employeeName || log.employeeName?.toLowerCase().includes(employeeName.toLowerCase()))
+      );
     });
   },
 

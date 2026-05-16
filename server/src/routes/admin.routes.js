@@ -108,6 +108,51 @@ adminRouter.post("/unlock-goal/:goalId", requireAuth, requireRole("Admin"), asyn
   }
 });
 
+adminRouter.put("/goal/:goalId", requireAuth, requireRole("Manager", "Admin"), async (req, res) => {
+  try {
+    const goal = await prisma.goal.findUnique({ where: { id: req.params.goalId } });
+    if (!goal) return res.status(404).json({ message: "Goal not found" });
+
+    const updates = {};
+    if (req.body.target !== undefined && String(req.body.target) !== String(goal.target)) {
+      updates.target = String(req.body.target);
+      await prisma.auditLog.create({
+        data: {
+          entityType: "Goal",
+          entityId: goal.id,
+          goalId: goal.id,
+          fieldChanged: "target",
+          oldValue: goal.target,
+          newValue: String(req.body.target),
+          changedBy: req.user.sub,
+          changeDescription: "Manager edited target during approval"
+        }
+      });
+    }
+    if (req.body.weightage !== undefined && Number(req.body.weightage) !== goal.weightage) {
+      updates.weightage = Number(req.body.weightage);
+      await prisma.auditLog.create({
+        data: {
+          entityType: "Goal",
+          entityId: goal.id,
+          goalId: goal.id,
+          fieldChanged: "weightage",
+          oldValue: String(goal.weightage),
+          newValue: String(req.body.weightage),
+          changedBy: req.user.sub,
+          changeDescription: "Manager edited weightage during approval"
+        }
+      });
+    }
+    const updated = await prisma.goal.update({ where: { id: goal.id }, data: updates });
+    return res.json({ goal: updated });
+  } catch {
+    const goal = demoStore.editGoal(req.params.goalId, req.body, req.user.sub);
+    if (!goal) return res.status(404).json({ message: "Goal not found" });
+    return res.json({ goal });
+  }
+});
+
 adminRouter.get("/org", requireAuth, requireRole("Admin"), (_req, res) => {
   res.json({ org: demoStore.getOrg() });
 });
