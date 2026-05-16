@@ -1,0 +1,1133 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  ArrowRight,
+  BarChart3,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardCheck,
+  Download,
+  FileSpreadsheet,
+  LockKeyhole,
+  LogOut,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Unlock,
+  UserCog,
+  UsersRound
+} from "lucide-react";
+import * as XLSX from "xlsx";
+import "./styles.css";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const quarters = ["Q1", "Q2", "Q3", "Q4"];
+const quarterMeta = {
+  Q1: { label: "Q1", window: "July", shortWindow: "Jul" },
+  Q2: { label: "Q2", window: "October", shortWindow: "Oct" },
+  Q3: { label: "Q3", window: "January", shortWindow: "Jan" },
+  Q4: { label: "Q4", window: "March-April", shortWindow: "Mar-Apr" }
+};
+const statuses = ["NotStarted", "OnTrack", "Completed"];
+
+const demoUsers = [
+  { role: "Employee", email: "employee@atomquest.test", password: "Password123!" },
+  { role: "Manager", email: "manager@atomquest.test", password: "Password123!" },
+  { role: "Admin", email: "admin@atomquest.test", password: "Password123!" }
+];
+
+const routeByRole = {
+  Employee: "/employee/my-goals",
+  Manager: "/manager/my-team",
+  Admin: "/admin/windows"
+};
+
+function token() {
+  return localStorage.getItem("aq_token");
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
+      ...(options.headers || {})
+    }
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || "Request failed");
+  }
+  return data;
+}
+
+function downloadBlob(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function rowsToCsv(rows) {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const escape = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  return [headers.join(","), ...rows.map((row) => headers.map((header) => escape(row[header])).join(","))].join("\n");
+}
+
+function exportRowsToXlsx(filename, rows, sheetName = "Report") {
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1:A1");
+  for (let column = range.s.c; column <= range.e.c; column += 1) {
+    const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: column })];
+    if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: "E6F4ED" } } };
+  }
+  for (let row = 1; row <= range.e.r; row += 1) {
+    for (let column = range.s.c; column <= range.e.c; column += 1) {
+      const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: column })];
+      if (cell && row % 2 === 0) cell.s = { fill: { fgColor: { rgb: "F7F8F4" } } };
+    }
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  XLSX.writeFile(workbook, filename);
+}
+
+function formatStatus(status) {
+  return status?.replace(/([A-Z])/g, " $1").trim() || "Pending";
+}
+
+function App() {
+  const storedUser = useMemo(() => {
+    const raw = localStorage.getItem("aq_user");
+    return raw ? JSON.parse(raw) : null;
+  }, []);
+
+  const [form, setForm] = useState({ email: demoUsers[0].email, password: demoUsers[0].password });
+  const [user, setUser] = useState(storedUser);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function login(event) {
+    event.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const data = await api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(form)
+      });
+
+      localStorage.setItem("aq_token", data.token);
+      localStorage.setItem("aq_user", JSON.stringify(data.user));
+      window.history.pushState({}, "", routeByRole[data.user.role] || "/");
+      setUser(data.user);
+    } catch (loginError) {
+      setError(loginError.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function selectDemoUser(demoUser) {
+    setForm({ email: demoUser.email, password: demoUser.password });
+    setError("");
+  }
+
+  function logout() {
+    localStorage.removeItem("aq_token");
+    localStorage.removeItem("aq_user");
+    window.history.pushState({}, "", "/");
+    setUser(null);
+  }
+
+  if (user?.role === "Employee") {
+    return <EmployeeDashboard user={user} onLogout={logout} />;
+  }
+
+  if (user?.role === "Manager") {
+    return <ManagerDashboard user={user} onLogout={logout} />;
+  }
+
+  if (user?.role === "Admin") {
+    return <AdminDashboard user={user} onLogout={logout} />;
+  }
+
+  return (
+    <main className="min-h-screen bg-[#f7f8f4] text-ink">
+      <section className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 gap-8 px-5 py-8 lg:grid-cols-[1fr_420px] lg:items-center">
+        <div className="space-y-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#dce4d8] bg-white px-3 py-2 text-sm font-medium text-[#4f614d]">
+            <ShieldCheck size={16} />
+            JWT role access for quarterly check-ins
+          </div>
+          <div className="max-w-2xl space-y-5">
+            <h1 className="text-4xl font-semibold leading-tight tracking-normal sm:text-5xl">Zenith</h1>
+            <p className="max-w-xl text-lg leading-8 text-[#586575]">
+              Goal achievement tracking for employees, manager check-ins, and admin-controlled quarter windows.
+            </p>
+          </div>
+          <div className="grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
+            {demoUsers.map((demoUser) => (
+              <button
+                className="rounded-lg border border-[#dce4d8] bg-white p-4 text-left shadow-sm transition hover:border-[#3d8b67] hover:shadow-md"
+                key={demoUser.email}
+                onClick={() => selectDemoUser(demoUser)}
+                type="button"
+              >
+                <span className="block text-sm font-semibold">{demoUser.role}</span>
+                <span className="mt-2 block break-all text-xs text-[#697789]">{demoUser.email}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form className="rounded-lg border border-[#dce4d8] bg-white p-6 shadow-xl shadow-[#dce8df]/60" onSubmit={login}>
+          <div className="mb-7 flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-lg bg-[#e6f4ed] text-[#247e57]">
+              <LockKeyhole size={22} />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Welcome back</h2>
+              <p className="text-sm text-[#697789]">Use any seeded demo account.</p>
+            </div>
+          </div>
+
+          <label className="mb-4 block">
+            <span className="mb-2 block text-sm font-medium">Email</span>
+            <input
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-3 outline-none transition focus:border-[#3d8b67] focus:ring-4 focus:ring-[#dff4eb]"
+              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              type="email"
+              value={form.email}
+            />
+          </label>
+
+          <label className="mb-5 block">
+            <span className="mb-2 block text-sm font-medium">Password</span>
+            <input
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-3 outline-none transition focus:border-[#3d8b67] focus:ring-4 focus:ring-[#dff4eb]"
+              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              type="password"
+              value={form.password}
+            />
+          </label>
+
+          {error ? <p className="mb-4 rounded-md bg-[#fff1f0] px-3 py-2 text-sm text-[#a13a31]">{error}</p> : null}
+
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-3 font-semibold text-white transition hover:bg-[#263349] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isLoading}
+            type="submit"
+          >
+            {isLoading ? "Signing in" : "Sign in"}
+            <ArrowRight size={18} />
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function Shell({ user, onLogout, children, icon, title, subtitle }) {
+  return (
+    <main className="min-h-screen bg-[#f7f8f4] px-5 py-8 text-ink">
+      <section className="mx-auto max-w-7xl">
+        <nav className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[#dce4d8] pb-5">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-lg bg-[#e6f4ed] text-[#247e57]">{icon}</div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">Zenith</p>
+              <h1 className="text-2xl font-semibold">{title}</h1>
+              <p className="text-sm text-[#697789]">{subtitle}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-[#dce4d8] bg-white px-3 py-2 text-sm">
+              {user.name} · {user.role}
+            </span>
+            <button className="inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-medium" onClick={onLogout}>
+              <LogOut size={16} />
+              Log out
+            </button>
+          </div>
+        </nav>
+        {children}
+      </section>
+    </main>
+  );
+}
+
+function QuarterPicker({ quarter, setQuarter }) {
+  return (
+    <div className="inline-flex rounded-lg border border-[#dce4d8] bg-white p-1">
+      {quarters.map((item) => (
+        <button
+          className={`rounded-md px-4 py-2 text-left text-sm font-semibold ${quarter === item ? "bg-ink text-white" : "text-[#536272]"}`}
+          key={item}
+          onClick={() => setQuarter(item)}
+          type="button"
+        >
+          <span className="block leading-5">{quarterMeta[item].label}</span>
+          <span className={`block text-xs leading-4 ${quarter === item ? "text-[#dbe6f5]" : "text-[#7a8795]"}`}>{quarterMeta[item].shortWindow}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SummaryBanner({ quarter, updated, total, window }) {
+  return (
+    <div className="mb-6 grid gap-4 rounded-lg border border-[#dce4d8] bg-white p-5 shadow-sm md:grid-cols-[1fr_auto] md:items-center">
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">
+          {quarter} Check-in · {quarterMeta[quarter].window}
+        </p>
+        <h2 className="mt-1 text-2xl font-semibold">
+          {updated} of {total} goals updated
+        </h2>
+        <p className="mt-2 text-sm text-[#697789]">
+          {window?.isOpen ? "Check-in window is open" : "Check-in window is not currently open"}
+        </p>
+      </div>
+      <div className={`rounded-md px-4 py-3 text-sm font-semibold ${window?.isOpen ? "bg-[#e6f4ed] text-[#17633f]" : "bg-[#fff5df] text-[#8a5a00]"}`}>
+        {window?.isOpen ? "Open for updates" : "Inputs disabled"}
+      </div>
+    </div>
+  );
+}
+
+function ScoreBadge({ progress }) {
+  const band = progress?.band || bandForScore(progress?.scorePercent);
+  const palette = {
+    green: "bg-[#e6f4ed] text-[#17633f] border-[#bfe4d0]",
+    amber: "bg-[#fff5df] text-[#8a5a00] border-[#f0d48c]",
+    red: "bg-[#fff1f0] text-[#a13a31] border-[#efbeb9]",
+    neutral: "bg-[#eef2f6] text-[#536272] border-[#d9e0e8]"
+  };
+
+  return (
+    <span className={`inline-flex min-w-24 justify-center rounded-full border px-3 py-1 text-sm font-bold ${palette[band]}`}>
+      {progress?.scoreLabel || "Pending"}
+    </span>
+  );
+}
+
+function bandForScore(score) {
+  if (score === null || score === undefined) return "neutral";
+  if (score >= 80) return "green";
+  if (score >= 50) return "amber";
+  return "red";
+}
+
+function EmployeeDashboard({ user, onLogout }) {
+  const [quarter, setQuarter] = useState("Q1");
+  const [dashboard, setDashboard] = useState(null);
+  const [forms, setForms] = useState({});
+  const [message, setMessage] = useState("");
+
+  async function loadDashboard(activeQuarter = quarter) {
+    const data = await api(`/api/achievements/dashboard/${user.id}/${activeQuarter}`);
+    setDashboard(data);
+    setForms(
+      Object.fromEntries(
+        data.goals.map((goal) => [
+          goal.id,
+          {
+            actual: goal.achievement?.actual || "",
+            progressStatus: goal.achievement?.progressStatus || "OnTrack"
+          }
+        ])
+      )
+    );
+  }
+
+  useEffect(() => {
+    setMessage("");
+    loadDashboard(quarter).catch((error) => setMessage(error.message));
+  }, [quarter]);
+
+  async function submitGoal(goal) {
+    setMessage("");
+    try {
+      await api("/api/achievements", {
+        method: "POST",
+        body: JSON.stringify({
+          goalId: goal.id,
+          quarter,
+          actual: forms[goal.id]?.actual,
+          progressStatus: forms[goal.id]?.progressStatus
+        })
+      });
+      await loadDashboard();
+      setMessage(`${goal.title} submitted and locked for ${quarter}.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  const isWindowOpen = dashboard?.window?.isOpen;
+
+  return (
+    <Shell user={user} onLogout={onLogout} icon={<BarChart3 size={22} />} title="My Goals" subtitle="Locked approved goals and quarterly achievement updates">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
+      </div>
+
+      {dashboard ? <SummaryBanner quarter={quarter} updated={dashboard.summary.updatedGoals} total={dashboard.summary.totalGoals} window={dashboard.window} /> : null}
+      {message ? <p className="mb-5 rounded-md border border-[#dce4d8] bg-white px-4 py-3 text-sm font-medium text-[#536272]">{message}</p> : null}
+
+      <div className="grid gap-4">
+        {dashboard?.goals.map((goal) => {
+          const locked = Boolean(goal.achievement?.isLocked);
+          const disabled = !isWindowOpen || locked;
+          return (
+            <article className="rounded-lg border border-[#dce4d8] bg-white p-5 shadow-sm" key={goal.id}>
+              <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-[#eef2f6] px-3 py-1 text-xs font-semibold text-[#536272]">{goal.thrustArea}</span>
+                    <span className="rounded-full bg-[#e6f4ed] px-3 py-1 text-xs font-semibold text-[#17633f]">{goal.uomType} UoM</span>
+                    <span className="rounded-full bg-[#f5eee6] px-3 py-1 text-xs font-semibold text-[#7b5131]">{goal.weightage}% weightage</span>
+                  </div>
+                  <h3 className="mt-3 text-xl font-semibold">{goal.title}</h3>
+                  <p className="mt-2 leading-7 text-[#586575]">{goal.description}</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <Metric label="Planned target" value={goal.target} />
+                    <Metric label="Actual achievement" value={goal.achievement?.actual || "Pending"} />
+                    <Metric label="Progress score" value={<ScoreBadge progress={goal.progress} />} />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-4">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h4 className="font-semibold">{quarter} achievement update</h4>
+                    {locked ? <span className="rounded-full bg-[#eef2f6] px-3 py-1 text-xs font-semibold text-[#536272]">Locked</span> : null}
+                  </div>
+                  {!isWindowOpen ? <p className="mb-3 rounded-md bg-[#fff5df] px-3 py-2 text-sm text-[#8a5a00]">Check-in window is not currently open</p> : null}
+                  <label className="mb-3 block">
+                    <span className="mb-2 block text-sm font-medium">{goal.uomType === "Timeline" ? "Completion date" : "Actual achievement"}</span>
+                    <input
+                      className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#eef2f6]"
+                      disabled={disabled}
+                      onChange={(event) =>
+                        setForms((current) => ({ ...current, [goal.id]: { ...current[goal.id], actual: event.target.value } }))
+                      }
+                      type={goal.uomType === "Timeline" ? "date" : "number"}
+                      value={forms[goal.id]?.actual || ""}
+                    />
+                  </label>
+                  <label className="mb-4 block">
+                    <span className="mb-2 block text-sm font-medium">Status</span>
+                    <select
+                      className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#eef2f6]"
+                      disabled={disabled}
+                      onChange={(event) =>
+                        setForms((current) => ({ ...current, [goal.id]: { ...current[goal.id], progressStatus: event.target.value } }))
+                      }
+                      value={forms[goal.id]?.progressStatus || "OnTrack"}
+                    >
+                      {statuses.map((status) => (
+                        <option key={status} value={status}>
+                          {status.replace(/([A-Z])/g, " $1").trim()}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={disabled || !forms[goal.id]?.actual}
+                    onClick={() => submitGoal(goal)}
+                    type="button"
+                  >
+                    <CheckCircle2 size={17} />
+                    Submit update
+                  </button>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </Shell>
+  );
+}
+
+function ManagerDashboard({ user, onLogout }) {
+  const [view, setView] = useState("team");
+  const [quarter, setQuarter] = useState("Q1");
+  const [team, setTeam] = useState(null);
+  const [comments, setComments] = useState({});
+  const [message, setMessage] = useState("");
+
+  async function loadTeam(activeQuarter = quarter) {
+    const data = await api(`/api/checkins/team/${user.id}/${activeQuarter}`);
+    setTeam(data);
+    setComments(
+      Object.fromEntries(
+        data.reportees.map((report) => [
+          report.goalSheet?.id,
+          {
+            comment: report.checkIn?.comment || "",
+            isCompleted: Boolean(report.checkIn?.isCompleted)
+          }
+        ])
+      )
+    );
+  }
+
+  useEffect(() => {
+    setMessage("");
+    loadTeam(quarter).catch((error) => setMessage(error.message));
+  }, [quarter]);
+
+  async function submitCheckIn(report) {
+    setMessage("");
+    try {
+      await api("/api/checkins", {
+        method: "POST",
+        body: JSON.stringify({
+          goalSheetId: report.goalSheet.id,
+          quarter,
+          comment: comments[report.goalSheet.id]?.comment,
+          isCompleted: comments[report.goalSheet.id]?.isCompleted
+        })
+      });
+      await loadTeam();
+      setMessage(`Check-in saved for ${report.employee.name}.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  const total = team?.reportees.reduce((count, report) => count + report.summary.totalGoals, 0) || 0;
+  const updated = team?.reportees.reduce((count, report) => count + report.summary.updatedGoals, 0) || 0;
+
+  if (view === "reports") {
+    return (
+      <Shell user={user} onLogout={onLogout} icon={<FileSpreadsheet size={22} />} title="Reports" subtitle="Achievement reporting for your direct team">
+        <ManagerNav view={view} setView={setView} />
+        <AchievementReport currentUser={user} managerOnly />
+      </Shell>
+    );
+  }
+
+  if (view === "completion") {
+    return (
+      <Shell user={user} onLogout={onLogout} icon={<ClipboardCheck size={22} />} title="Completion Dashboard" subtitle="Team check-in completion status">
+        <ManagerNav view={view} setView={setView} />
+        <CompletionDashboard currentUser={user} managerOnly />
+      </Shell>
+    );
+  }
+
+  return (
+    <Shell user={user} onLogout={onLogout} icon={<UsersRound size={22} />} title="My Team" subtitle="Direct reportee progress and structured quarterly check-ins">
+      <ManagerNav view={view} setView={setView} />
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
+      </div>
+
+      {team ? <SummaryBanner quarter={quarter} updated={updated} total={total} window={team.window} /> : null}
+      {message ? <p className="mb-5 rounded-md border border-[#dce4d8] bg-white px-4 py-3 text-sm font-medium text-[#536272]">{message}</p> : null}
+
+      <div className="grid gap-5">
+        {team?.reportees.map((report) => (
+          <article className="rounded-lg border border-[#dce4d8] bg-white p-5 shadow-sm" key={report.employee.id}>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">Direct reportee</p>
+                <h3 className="text-2xl font-semibold">{report.employee.name}</h3>
+                <p className="text-sm text-[#697789]">{report.employee.email}</p>
+              </div>
+              <ScoreBadge progress={{ scoreLabel: `${report.summary.updatedGoals}/${report.summary.totalGoals} updated`, band: "neutral" }} />
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-[#edf1eb]">
+              <table className="min-w-full divide-y divide-[#edf1eb] text-left text-sm">
+                <thead className="bg-[#fbfcf8] text-[#536272]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Goal</th>
+                    <th className="px-4 py-3 font-semibold">Planned Target</th>
+                    <th className="px-4 py-3 font-semibold">Actual Achievement</th>
+                    <th className="px-4 py-3 font-semibold">Progress Score</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#edf1eb]">
+                  {report.goals.map((goal) => (
+                    <tr key={goal.id}>
+                      <td className="px-4 py-3">
+                        <span className="block font-semibold">{goal.title}</span>
+                        <span className="text-xs text-[#697789]">{goal.uomType} UoM</span>
+                      </td>
+                      <td className="px-4 py-3">{goal.target}</td>
+                      <td className="px-4 py-3">{goal.achievement?.actual || "Pending"}</td>
+                      <td className="px-4 py-3">
+                        <ScoreBadge
+                          progress={{
+                            scorePercent: goal.achievement?.scorePercent,
+                            scoreLabel: goal.achievement?.scoreLabel || "Pending",
+                            band: bandForScore(goal.achievement?.scorePercent)
+                          }}
+                        />
+                      </td>
+                      <td className="px-4 py-3">{goal.achievement?.progressStatus || "Pending"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {report.goalSheet ? (
+              <div className="mt-5 rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <ClipboardCheck size={18} />
+                  <h4 className="font-semibold">Structured check-in record</h4>
+                </div>
+                <label className="mb-3 block">
+                  <span className="mb-2 block text-sm font-medium">Discussion notes</span>
+                  <textarea
+                    className="min-h-28 w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none"
+                    onChange={(event) =>
+                      setComments((current) => ({
+                        ...current,
+                        [report.goalSheet.id]: { ...current[report.goalSheet.id], comment: event.target.value }
+                      }))
+                    }
+                    placeholder="Capture blockers, coaching actions, support needed, and next commitments."
+                    value={comments[report.goalSheet.id]?.comment || ""}
+                  />
+                </label>
+                <label className="mb-4 flex items-center gap-2 text-sm font-medium">
+                  <input
+                    checked={Boolean(comments[report.goalSheet.id]?.isCompleted)}
+                    onChange={(event) =>
+                      setComments((current) => ({
+                        ...current,
+                        [report.goalSheet.id]: { ...current[report.goalSheet.id], isCompleted: event.target.checked }
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  Mark check-in as completed for {quarter}
+                </label>
+                <button
+                  className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!comments[report.goalSheet.id]?.comment}
+                  onClick={() => submitCheckIn(report)}
+                  type="button"
+                >
+                  <CheckCircle2 size={17} />
+                  Save check-in
+                </button>
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </Shell>
+  );
+}
+
+function ManagerNav({ view, setView }) {
+  const items = [
+    ["team", "My Team"],
+    ["reports", "Reports"],
+    ["completion", "Completion"]
+  ];
+  return (
+    <div className="mb-5 flex flex-wrap gap-2">
+      {items.map(([id, label]) => (
+        <button className={`rounded-md px-4 py-2 text-sm font-semibold ${view === id ? "bg-ink text-white" : "border border-[#dce4d8] bg-white text-[#536272]"}`} key={id} onClick={() => setView(id)} type="button">
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AdminDashboard({ user, onLogout }) {
+  const [view, setView] = useState("overview");
+  const nav = [
+    ["overview", "Overview", ClipboardCheck],
+    ["reports", "Reports", FileSpreadsheet],
+    ["audit", "Audit Log", ShieldCheck],
+    ["cycle", "Cycle Management", SlidersHorizontal],
+    ["users", "User Management", UserCog]
+  ];
+
+  return (
+    <main className="min-h-screen bg-[#f7f8f4] text-ink">
+      <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
+        <aside className="border-r border-[#dce4d8] bg-white p-5">
+          <div className="mb-8">
+            <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">Zenith</p>
+            <h1 className="text-2xl font-semibold">Admin</h1>
+            <p className="text-sm text-[#697789]">{user.name}</p>
+          </div>
+          <div className="grid gap-2">
+            {nav.map(([id, label, Icon]) => (
+              <button className={`flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold ${view === id ? "bg-ink text-white" : "text-[#536272] hover:bg-[#f1f4ef]"}`} key={id} onClick={() => setView(id)} type="button">
+                <Icon size={17} />
+                {label}
+              </button>
+            ))}
+          </div>
+          <button className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-medium" onClick={onLogout}>
+            <LogOut size={16} />
+            Log out
+          </button>
+        </aside>
+        <section className="p-6 lg:p-8">
+          {view === "overview" ? <CompletionDashboard currentUser={user} /> : null}
+          {view === "reports" ? <AchievementReport currentUser={user} /> : null}
+          {view === "audit" ? <AuditLogPage /> : null}
+          {view === "cycle" ? <CycleManagement /> : null}
+          {view === "users" ? <UserManagement /> : null}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function AchievementReport({ currentUser, managerOnly = false }) {
+  const [filters, setFilters] = useState({ quarter: "Q1", managerId: managerOnly ? currentUser.id : "", status: "" });
+  const [data, setData] = useState({ rows: [], total: 0, page: 1, pageSize: 10 });
+  const [exporting, setExporting] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function load(page = data.page) {
+    const params = new URLSearchParams({ ...filters, page, pageSize: data.pageSize });
+    const report = await api(`/api/reports/achievement?${params.toString()}`);
+    setData(report);
+  }
+
+  useEffect(() => {
+    load(1).catch((error) => setMessage(error.message));
+  }, [filters.quarter, filters.managerId, filters.status]);
+
+  function mapReportRows(rows) {
+    return rows.map((row) => ({
+    "Employee Name": row.employeeName,
+    "Goal Title": row.goalTitle,
+    "Thrust Area": row.thrustArea,
+    "UoM Type": row.uomType,
+    "Planned Target": row.plannedTarget,
+    "Actual Achievement": row.actualAchievement || "Pending",
+    "Progress Score": row.progressScore,
+    Status: formatStatus(row.status),
+    Quarter: row.quarter
+    }));
+  }
+
+  const exportRows = mapReportRows(data.rows);
+
+  async function getAllFilteredRows() {
+    const params = new URLSearchParams({ ...filters, page: 1, pageSize: 100 });
+    const report = await api(`/api/reports/achievement?${params.toString()}`);
+    return mapReportRows(report.rows);
+  }
+
+  async function exportCsv() {
+    setExporting("csv");
+    downloadBlob(`zenith-achievement-${filters.quarter}.csv`, rowsToCsv(await getAllFilteredRows()), "text/csv;charset=utf-8");
+    setExporting("");
+  }
+
+  async function exportExcel() {
+    setExporting("xlsx");
+    exportRowsToXlsx(`zenith-achievement-${filters.quarter}.xlsx`, await getAllFilteredRows(), "Achievement Report");
+    setExporting("");
+  }
+
+  return (
+    <div>
+      <PageHeader title="Achievement Report" subtitle="Filterable achievement data with CSV and Excel exports" />
+      <div className="mb-5 grid gap-3 rounded-lg border border-[#dce4d8] bg-white p-4 md:grid-cols-4">
+        <Select label="Quarter" value={filters.quarter} onChange={(value) => setFilters((current) => ({ ...current, quarter: value }))} options={quarters.map((quarter) => [quarter, `${quarter} · ${quarterMeta[quarter].window}`])} />
+        <Select label="Team" value={filters.managerId} onChange={(value) => setFilters((current) => ({ ...current, managerId: value }))} options={managerOnly ? [[currentUser.id, "My Team"]] : [["", "All Teams"], ["demo-manager", "Morgan Manager"]]} />
+        <Select label="Status" value={filters.status} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={[["", "All Statuses"], ...statuses.map((status) => [status, formatStatus(status)])]} />
+        <div className="flex items-end gap-2">
+          <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-3 py-2 text-sm font-semibold" onClick={exportCsv} type="button">
+            <Download size={16} />
+            {exporting === "csv" ? "Exporting" : "CSV"}
+          </button>
+          <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white" onClick={exportExcel} type="button">
+            <FileSpreadsheet size={16} />
+            {exporting === "xlsx" ? "Exporting" : "Excel"}
+          </button>
+        </div>
+      </div>
+      {message ? <Notice>{message}</Notice> : null}
+      <DataTable
+        columns={["Employee Name", "Goal Title", "Thrust Area", "UoM Type", "Planned Target", "Actual Achievement", "Progress Score", "Status", "Quarter"]}
+        rows={exportRows}
+        page={data.page}
+        pageSize={data.pageSize}
+        total={data.total}
+        onPage={(page) => load(page)}
+      />
+    </div>
+  );
+}
+
+function CompletionDashboard({ currentUser, managerOnly = false }) {
+  const [data, setData] = useState(null);
+  const [search, setSearch] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    setData(await api("/api/reports/completion"));
+  }
+
+  useEffect(() => {
+    load().catch((error) => setMessage(error.message));
+  }, []);
+
+  const employees = (data?.employeeRows || []).filter((row) => row.employeeName.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div>
+      <PageHeader title="Completion Dashboard" subtitle={managerOnly ? "Direct team check-in completion" : "Real-time completion status across Zenith"} />
+      {message ? <Notice>{message}</Notice> : null}
+      <div className="mb-5 grid gap-4 md:grid-cols-4">
+        {data?.summaryCards.map((card) => (
+          <article className="rounded-lg border border-[#dce4d8] bg-white p-5 shadow-sm" key={card.quarter}>
+            <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">{card.quarter} · {quarterMeta[card.quarter].window}</p>
+            <h3 className="mt-2 text-2xl font-semibold">{card.completed} of {card.total}</h3>
+            <p className="mt-1 text-sm text-[#697789]">employees have completed check-ins</p>
+          </article>
+        ))}
+      </div>
+      <label className="mb-4 flex max-w-sm items-center gap-2 rounded-md border border-[#dce4d8] bg-white px-3 py-2">
+        <Search size={16} />
+        <input className="w-full bg-transparent outline-none" placeholder="Search employees" value={search} onChange={(event) => setSearch(event.target.value)} />
+      </label>
+      <div className="mb-6 rounded-lg border border-[#dce4d8] bg-white p-4 shadow-sm">
+        <h3 className="mb-3 text-lg font-semibold">Employees</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-[#536272]">
+              <tr>{["Employee Name", "Goals Submitted", "Goals Approved", "Q1 Done", "Q2 Done", "Q3 Done", "Q4 Done"].map((header) => <th className="border-b border-[#edf1eb] px-3 py-2" key={header}>{header}</th>)}</tr>
+            </thead>
+            <tbody>
+              {employees.map((row) => (
+                <tr key={row.employeeId}>
+                  <td className="border-b border-[#edf1eb] px-3 py-2 font-semibold">{row.employeeName}</td>
+                  <td className="border-b border-[#edf1eb] px-3 py-2">{row.goalsSubmitted}</td>
+                  <td className="border-b border-[#edf1eb] px-3 py-2">{row.goalsApproved}</td>
+                  {quarters.map((quarter) => <td className="border-b border-[#edf1eb] px-3 py-2" key={quarter}><StatusDot done={row.quarters[quarter]} /></td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="rounded-lg border border-[#dce4d8] bg-white p-4 shadow-sm">
+        <h3 className="mb-3 text-lg font-semibold">Managers</h3>
+        <DataTable columns={["Manager Name", "Team Size", "Check-ins Completed", "Check-ins Pending"]} rows={(data?.managerRows || []).map((row) => ({ "Manager Name": row.managerName, "Team Size": row.teamSize, "Check-ins Completed": row.checkInsCompleted, "Check-ins Pending": row.checkInsPending }))} />
+      </div>
+    </div>
+  );
+}
+
+function AuditLogPage() {
+  const [filters, setFilters] = useState({ from: "", to: "", employeeId: "" });
+  const [data, setData] = useState({ rows: [], total: 0, page: 1, pageSize: 10 });
+  const [message, setMessage] = useState("");
+
+  async function load(page = data.page) {
+    const params = new URLSearchParams({ ...filters, page, pageSize: data.pageSize });
+    setData(await api(`/api/audit-logs?${params.toString()}`));
+  }
+
+  useEffect(() => {
+    load(1).catch((error) => setMessage(error.message));
+  }, [filters.from, filters.to, filters.employeeId]);
+
+  const rows = data.rows.map((row) => ({
+    Timestamp: new Date(row.timestamp).toLocaleString(),
+    User: row.user,
+    Role: row.role,
+    "Goal Title": row.goalTitle,
+    "Field Changed": row.fieldChanged,
+    "Old Value": row.oldValue,
+    "New Value": row.newValue
+  }));
+
+  return (
+    <div>
+      <PageHeader title="Audit Log" subtitle="Admin-only governance trail for locked-goal changes" />
+      <div className="mb-5 grid gap-3 rounded-lg border border-[#dce4d8] bg-white p-4 md:grid-cols-4">
+        <Input label="From" type="date" value={filters.from} onChange={(value) => setFilters((current) => ({ ...current, from: value }))} />
+        <Input label="To" type="date" value={filters.to} onChange={(value) => setFilters((current) => ({ ...current, to: value }))} />
+        <Input label="Employee ID" value={filters.employeeId} onChange={(value) => setFilters((current) => ({ ...current, employeeId: value }))} />
+        <div className="flex items-end">
+          <button className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={() => downloadBlob("zenith-audit-log.csv", rowsToCsv(rows), "text/csv;charset=utf-8")} type="button">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
+      </div>
+      {message ? <Notice>{message}</Notice> : null}
+      <DataTable columns={["Timestamp", "User", "Role", "Goal Title", "Field Changed", "Old Value", "New Value"]} rows={rows} page={data.page} pageSize={data.pageSize} total={data.total} onPage={(page) => load(page)} />
+    </div>
+  );
+}
+
+function CycleManagement() {
+  const [cycle, setCycle] = useState({ activeCycleYear: 2026, windows: [] });
+  const [message, setMessage] = useState("");
+  const [confirm, setConfirm] = useState(null);
+
+  async function load() {
+    setCycle(await api("/api/admin/cycle"));
+  }
+
+  useEffect(() => {
+    load().catch((error) => setMessage(error.message));
+  }, []);
+
+  async function save(nextCycle = cycle) {
+    const saved = await api("/api/admin/cycle", { method: "PUT", body: JSON.stringify(nextCycle) });
+    setCycle(saved);
+    setMessage("Cycle settings saved.");
+  }
+
+  function toggleQuarter(quarter) {
+    const windows = quarters.map((item) => {
+      const current = cycle.windows.find((window) => window.quarter === item);
+      return item === quarter ? { quarter: item, isOpen: !current?.isOpen } : { quarter: item, isOpen: Boolean(current?.isOpen) };
+    });
+    setConfirm({ title: `Change ${quarter} window?`, body: "This admin action changes whether employees can submit achievements.", action: () => save({ ...cycle, windows }) });
+  }
+
+  return (
+    <div>
+      <PageHeader title="Cycle Management" subtitle="Set active goal cycle and quarter window controls" />
+      {message ? <Notice>{message}</Notice> : null}
+      <div className="mb-5 rounded-lg border border-[#dce4d8] bg-white p-5">
+        <Input label="Active goal cycle year" type="number" value={cycle.activeCycleYear} onChange={(value) => setCycle((current) => ({ ...current, activeCycleYear: value }))} />
+        <button className="mt-3 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={() => setConfirm({ title: "Save cycle year?", body: "This will update the active goal cycle year.", action: () => save() })} type="button">Save cycle</button>
+      </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        {quarters.map((quarter) => {
+          const window = cycle.windows.find((item) => item.quarter === quarter);
+          return (
+            <article className="rounded-lg border border-[#dce4d8] bg-white p-5" key={quarter}>
+              <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">{quarter}</p>
+              <p className="text-sm text-[#697789]">{quarterMeta[quarter].window}</p>
+              <h3 className="mt-2 text-2xl font-semibold">{window?.isOpen ? "Open" : "Closed"}</h3>
+              <button className={`mt-4 w-full rounded-md px-4 py-2 text-sm font-semibold ${window?.isOpen ? "border border-[#cfd9cf] bg-white" : "bg-ink text-white"}`} onClick={() => toggleQuarter(quarter)} type="button">
+                {window?.isOpen ? `Close ${quarter}` : `Open ${quarter}`}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+      {confirm ? <ConfirmModal confirm={confirm} onClose={() => setConfirm(null)} /> : null}
+    </div>
+  );
+}
+
+function UserManagement() {
+  const [users, setUsers] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [org, setOrg] = useState([]);
+  const [search, setSearch] = useState("");
+  const [message, setMessage] = useState("");
+  const [confirm, setConfirm] = useState(null);
+
+  async function load() {
+    const [userData, goalData, orgData] = await Promise.all([api("/api/admin/users"), api(`/api/admin/goals?search=${encodeURIComponent(search)}`), api("/api/admin/org")]);
+    setUsers(userData.users);
+    setGoals(goalData.goals);
+    setOrg(orgData.org);
+  }
+
+  useEffect(() => {
+    load().catch((error) => setMessage(error.message));
+  }, [search]);
+
+  async function unlockGoal(goal) {
+    await api(`/api/admin/unlock-goal/${goal.id}`, { method: "POST", body: JSON.stringify({}) });
+    setMessage(`${goal.title} unlocked and audit logged.`);
+    await load();
+  }
+
+  async function reassign(userId, managerId) {
+    await api(`/api/admin/user/${userId}/manager`, { method: "PUT", body: JSON.stringify({ managerId }) });
+    setMessage("Manager assignment updated.");
+    await load();
+  }
+
+  const managers = users.filter((user) => user.role === "Manager");
+
+  return (
+    <div>
+      <PageHeader title="User Management" subtitle="Goal unlocks, reporting managers, and org hierarchy" />
+      {message ? <Notice>{message}</Notice> : null}
+      <div className="mb-6 rounded-lg border border-[#dce4d8] bg-white p-5">
+        <h3 className="mb-3 text-lg font-semibold">Goal Unlock</h3>
+        <label className="mb-4 flex max-w-sm items-center gap-2 rounded-md border border-[#dce4d8] px-3 py-2">
+          <Search size={16} />
+          <input className="w-full outline-none" placeholder="Search employee or goal" value={search} onChange={(event) => setSearch(event.target.value)} />
+        </label>
+        <div className="grid gap-3">
+          {goals.slice(0, 5).map((goal) => (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#edf1eb] p-3" key={goal.id}>
+              <div>
+                <p className="font-semibold">{goal.employee.name} · {goal.title}</p>
+                <p className="text-sm text-[#697789]">{goal.thrustArea} · {goal.uomType}</p>
+              </div>
+              <button className="inline-flex items-center gap-2 rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white" onClick={() => setConfirm({ title: "Are you sure you want to unlock this goal?", body: "This will be logged in the audit trail automatically.", action: () => unlockGoal(goal) })} type="button">
+                <Unlock size={16} /> Unlock
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mb-6 rounded-lg border border-[#dce4d8] bg-white p-5">
+        <h3 className="mb-3 text-lg font-semibold">Users</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead><tr>{["Name", "Role", "Manager"].map((header) => <th className="border-b border-[#edf1eb] px-3 py-2" key={header}>{header}</th>)}</tr></thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td className="border-b border-[#edf1eb] px-3 py-2 font-semibold">{user.name}</td>
+                  <td className="border-b border-[#edf1eb] px-3 py-2">{user.role}</td>
+                  <td className="border-b border-[#edf1eb] px-3 py-2">
+                    {user.role === "Employee" ? (
+                      <select className="rounded-md border border-[#cfd9cf] px-2 py-1" value={user.managerId || ""} onChange={(event) => setConfirm({ title: "Change reporting manager?", body: "This admin action updates the org hierarchy and is audit logged.", action: () => reassign(user.id, event.target.value) })}>
+                        <option value="">Unassigned</option>
+                        {managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}
+                      </select>
+                    ) : "N/A"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="rounded-lg border border-[#dce4d8] bg-white p-5">
+        <h3 className="mb-3 text-lg font-semibold">Org Hierarchy</h3>
+        {org.map((leader) => (
+          <div className="mb-4" key={leader.id}>
+            <p className="font-semibold">{leader.name} · {leader.role}</p>
+            <div className="mt-2 grid gap-2 pl-4">
+              {leader.reports.map((report) => <p className="rounded-md bg-[#f7f8f4] px-3 py-2 text-sm" key={report.id}>{report.name} · {report.role}</p>)}
+            </div>
+          </div>
+        ))}
+      </div>
+      {confirm ? <ConfirmModal confirm={confirm} onClose={() => setConfirm(null)} /> : null}
+    </div>
+  );
+}
+
+function DataTable({ columns, rows, page = 1, pageSize = rows.length || 10, total = rows.length, onPage }) {
+  const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+  return (
+    <div className="rounded-lg border border-[#dce4d8] bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-[#fbfcf8] text-[#536272]">
+            <tr>{columns.map((column) => <th className="border-b border-[#edf1eb] px-4 py-3 font-semibold" key={column}>{column}</th>)}</tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr className={index % 2 ? "bg-[#fbfcf8]" : "bg-white"} key={`${index}-${columns[0]}`}>
+                {columns.map((column) => <td className="border-b border-[#edf1eb] px-4 py-3" key={column}>{row[column]}</td>)}
+              </tr>
+            ))}
+            {!rows.length ? <tr><td className="px-4 py-6 text-center text-[#697789]" colSpan={columns.length}>No rows found</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+      {onPage ? (
+        <div className="flex items-center justify-between px-4 py-3 text-sm">
+          <span>Page {page} of {pageCount} · {total} rows</span>
+          <div className="flex gap-2">
+            <button className="rounded-md border border-[#cfd9cf] px-3 py-1 disabled:opacity-50" disabled={page <= 1} onClick={() => onPage(page - 1)} type="button">Previous</button>
+            <button className="rounded-md border border-[#cfd9cf] px-3 py-1 disabled:opacity-50" disabled={page >= pageCount} onClick={() => onPage(page + 1)} type="button">Next</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PageHeader({ title, subtitle }) {
+  return (
+    <div className="mb-6">
+      <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">Zenith</p>
+      <h2 className="text-3xl font-semibold">{title}</h2>
+      <p className="mt-1 text-[#697789]">{subtitle}</p>
+    </div>
+  );
+}
+
+function Select({ label, value, onChange, options }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium">{label}</span>
+      <select className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function Input({ label, value, onChange, type = "text" }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium">{label}</span>
+      <input className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
+  );
+}
+
+function Notice({ children }) {
+  return <p className="mb-5 rounded-md border border-[#dce4d8] bg-white px-4 py-3 text-sm font-medium text-[#536272]">{children}</p>;
+}
+
+function StatusDot({ done }) {
+  return <span className={`inline-flex size-7 items-center justify-center rounded-full text-sm font-bold ${done ? "bg-[#e6f4ed] text-[#17633f]" : "bg-[#fff1f0] text-[#a13a31]"}`}>{done ? "✓" : "×"}</span>;
+}
+
+function ConfirmModal({ confirm, onClose }) {
+  async function run() {
+    await confirm.action();
+    onClose();
+  }
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <h3 className="text-xl font-semibold">{confirm.title}</h3>
+        <p className="mt-3 leading-7 text-[#586575]">{confirm.body}</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button className="rounded-md border border-[#cfd9cf] px-4 py-2 text-sm font-semibold" onClick={onClose} type="button">Cancel</button>
+          <button className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={run} type="button">Confirm</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }) {
+  return (
+    <div className="rounded-md border border-[#edf1eb] bg-[#fbfcf8] p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#697789]">{label}</p>
+      <div className="mt-2 text-base font-semibold">{value}</div>
+    </div>
+  );
+}
+
+createRoot(document.getElementById("root")).render(<App />);

@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  Employee
+  Manager
+  Admin
+}
+
+enum GoalSheetStatus {
+  Draft
+  Submitted
+  Approved
+  Rejected
+}
+
+enum GoalStatus {
+  Draft
+  Active
+  Completed
+  Cancelled
+}
+
+enum UomType {
+  Min
+  Max
+  Timeline
+  Zero
+}
+
+enum Quarter {
+  Q1
+  Q2
+  Q3
+  Q4
+}
+
+enum ProgressStatus {
+  NotStarted
+  OnTrack
+  AtRisk
+  Behind
+  Completed
+}
+
+model User {
+  id           String      @id @default(uuid())
+  name         String
+  email        String      @unique
+  passwordHash String
+  role         Role
+  department   String?
+  managerId    String?
+  manager      User?       @relation("ManagerEmployees", fields: [managerId], references: [id])
+  employees    User[]      @relation("ManagerEmployees")
+  goalSheets   GoalSheet[] @relation("EmployeeGoalSheets")
+  checkIns     CheckIn[]   @relation("ManagerCheckIns")
+  auditLogs    AuditLog[]  @relation("ChangedByUser")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model GoalSheet {
+  id          String          @id @default(uuid())
+  employeeId  String
+  employee    User            @relation("EmployeeGoalSheets", fields: [employeeId], references: [id])
+  cycleYear   Int
+  status      GoalSheetStatus @default(Draft)
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  goals       Goal[]
+  checkIns    CheckIn[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([employeeId, cycleYear])
+}
+
+model Goal {
+  id           String        @id @default(uuid())
+  goalSheetId  String
+  goalSheet    GoalSheet     @relation(fields: [goalSheetId], references: [id], onDelete: Cascade)
+  thrustArea   String
+  title        String
+  description  String
+  uomType      UomType
+  target       String
+  weightage    Int
+  status       GoalStatus    @default(Draft)
+  isShared     Boolean       @default(false)
+  isLocked     Boolean       @default(false)
+  achievements Achievement[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Achievement {
+  id             String         @id @default(uuid())
+  goalId          String
+  goal            Goal           @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  quarter         Quarter
+  actual          String
+  progressStatus  ProgressStatus
+  scorePercent    Float?
+  scoreLabel      String?
+  isLocked        Boolean        @default(false)
+  submittedAt     DateTime?
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([goalId, quarter])
+}
+
+model CheckIn {
+  id          String    @id @default(uuid())
+  goalSheetId String
+  goalSheet   GoalSheet @relation(fields: [goalSheetId], references: [id], onDelete: Cascade)
+  managerId   String
+  manager     User      @relation("ManagerCheckIns", fields: [managerId], references: [id])
+  quarter     Quarter
+  comment     String
+  isCompleted Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@unique([goalSheetId, managerId, quarter])
+}
+
+model QuarterWindow {
+  id        String   @id @default(uuid())
+  quarter   Quarter  @unique
+  isOpen    Boolean  @default(false)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id                String   @id @default(uuid())
+  entityType        String
+  entityId          String
+  goalId            String?
+  fieldChanged      String?
+  oldValue          String?
+  newValue          String?
+  changedBy         String
+  user              User     @relation("ChangedByUser", fields: [changedBy], references: [id])
+  changeDescription String
+  changedAt         DateTime @default(now())
+}
