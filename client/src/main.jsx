@@ -821,7 +821,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                   <label className="mb-3 block">
                     <span className="mb-2 block text-sm font-medium">{goal.uomType === "Timeline" ? "Completion date" : "Actual achievement"}</span>
                     <input
-                      className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#eef2f6]"
+                      className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-ink outline-none bg-white disabled:bg-[#f3f5f0] disabled:text-[#536272] disabled:opacity-100"
                       disabled={disabled || submitLoading[goal.id]}
                       onChange={(event) =>
                         setForms((current) => ({ ...current, [goal.id]: { ...current[goal.id], actual: event.target.value } }))
@@ -833,7 +833,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                   <label className="mb-4 block">
                     <span className="mb-2 block text-sm font-medium">Status</span>
                     <select
-                      className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#eef2f6]"
+                      className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-ink outline-none bg-white disabled:bg-[#f3f5f0] disabled:text-[#536272] disabled:opacity-100"
                       disabled={disabled || submitLoading[goal.id]}
                       onChange={(event) =>
                         setForms((current) => ({ ...current, [goal.id]: { ...current[goal.id], progressStatus: event.target.value } }))
