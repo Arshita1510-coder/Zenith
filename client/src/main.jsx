@@ -768,7 +768,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                 </div>
                 <label className="mt-3 block">
                   <span className="mb-2 block text-sm font-medium">Description</span>
-                  <textarea className="min-h-20 w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#fbfcf8]" disabled={isFieldDisabled} value={goal.description} onChange={(event) => updateDraft(index, "description", event.target.value)} />
+                  <textarea className="min-h-20 w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-ink outline-none bg-white disabled:bg-[#f3f5f0] disabled:text-[#536272] disabled:opacity-100" disabled={isFieldDisabled} value={goal.description} onChange={(event) => updateDraft(index, "description", event.target.value)} />
                 </label>
               </article>
             );
@@ -2229,22 +2229,33 @@ function PageHeader({ title, subtitle }) {
   );
 }
 
-function Select({ label, value, onChange, options }) {
+function Select({ label, value, onChange, options, disabled }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium">{label}</span>
-      <select className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select 
+        className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-ink outline-none bg-white disabled:bg-[#f3f5f0] disabled:text-[#536272] disabled:opacity-100" 
+        value={value} 
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+      >
         {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
       </select>
     </label>
   );
 }
 
-function Input({ label, value, onChange, type = "text" }) {
+function Input({ label, value, onChange, type = "text", disabled }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium">{label}</span>
-      <input className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input 
+        className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-ink outline-none bg-white disabled:bg-[#f3f5f0] disabled:text-[#536272] disabled:opacity-100" 
+        type={type} 
+        value={value} 
+        onChange={(event) => onChange(event.target.value)} 
+        disabled={disabled}
+      />
     </label>
   );
 }
