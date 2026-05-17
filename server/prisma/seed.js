@@ -157,6 +157,37 @@ async function seedGoalsForEmployee(employee) {
     ]
   });
 
+  const createdGoals = await prisma.goal.findMany({ where: { goalSheetId: sheet.id } });
+  
+  const checkIn = await prisma.checkIn.create({
+    data: {
+      goalSheetId: sheet.id,
+      managerId: employee.managerId,
+      quarter: "Q1",
+      comment: "Good progress on all fronts so far this quarter.",
+      isCompleted: true
+    }
+  });
+
+  await prisma.achievement.createMany({
+    data: createdGoals.map(goal => {
+      let actual, scorePercent, scoreLabel;
+      if (goal.title === "Sales revenue") { actual = "85000"; scorePercent = 85; scoreLabel = "On Track"; }
+      else if (goal.title === "Customer turnaround time") { actual = "45"; scorePercent = 100; scoreLabel = "Exceeds"; }
+      else if (goal.title === "Enablement launch") { actual = "2026-06-15"; scorePercent = 100; scoreLabel = "Completed"; }
+      else if (goal.title === "Safety incidents") { actual = "0"; scorePercent = 100; scoreLabel = "On Track"; }
+      else { actual = "5"; scorePercent = 50; scoreLabel = "Needs Focus"; }
+
+      return {
+        goalId: goal.id,
+        quarter: "Q1",
+        actual,
+        progressStatus: "In Progress",
+        scorePercent,
+        scoreLabel,
+      };
+    })
+  });
 }
 
 main()

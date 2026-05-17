@@ -96,32 +96,84 @@ checkInsRouter.get("/:managerId/:quarter", requireAuth, requireRole("Manager", "
 
 checkInsRouter.post("/approve-goal-sheet", requireAuth, requireRole("Manager"), async (req, res) => {
   try {
+    if (req.user.sub?.startsWith("demo-")) {
+      const sheet = demoStore.approveGoalSheet(req.body.goalSheetId, req.user.sub);
+      if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
+      return res.json({ goalSheet: sheet });
+    }
+
     const sheet = await prisma.goalSheet.findUnique({ where: { id: req.body.goalSheetId }, include: { employee: true } });
     if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
     if (sheet.employee.managerId !== req.user.sub) {
       return res.status(403).json({ message: "Managers can only approve direct reportees" });
     }
+
     const goalSheet = await prisma.goalSheet.update({
       where: { id: sheet.id },
       data: { status: "Approved", approvedAt: new Date() }
     });
+
+    // Make all goals Active and Locked upon L1 Manager Approval
+    await prisma.goal.updateMany({
+      where: { goalSheetId: sheet.id },
+      data: { status: "Active", isLocked: true }
+    });
+
     await prisma.notification.create({
       data: {
         userId: sheet.employeeId,
         message: `Your goal sheet has been approved by ${req.user.name || "your manager"}`
       }
     });
+
     console.info("Ethereal preview URL: https://ethereal.email/message/demo-goal-approval-preview");
     return res.json({ goalSheet });
-  } catch {
+  } catch (error) {
+    console.error("Prisma error in approveGoalSheet:", error);
     const sheet = demoStore.approveGoalSheet(req.body.goalSheetId, req.user.sub);
     if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
     return res.json({ goalSheet: sheet });
   }
 });
 
-checkInsRouter.post("/return-goal-sheet", requireAuth, requireRole("Manager"), (req, res) => {
-  const sheet = demoStore.returnGoalSheet(req.body.goalSheetId, req.user.sub, req.body.comment);
-  if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
-  return res.json({ goalSheet: sheet });
+checkInsRouter.post("/return-goal-sheet", requireAuth, requireRole("Manager"), async (req, res) => {
+  try {
+    const { goalSheetId, comment } = req.body;
+    if (req.user.sub?.startsWith("demo-")) {
+      const sheet = demoStore.returnGoalSheet(goalSheetId, req.user.sub, comment);
+      if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
+      return res.json({ goalSheet: sheet });
+    }
+
+    const sheet = await prisma.goalSheet.findUnique({ where: { id: goalSheetId }, include: { employee: true } });
+    if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
+    if (sheet.employee.managerId !== req.user.sub) {
+      return res.status(403).json({ message: "Managers can only return direct reportees' goal sheets" });
+    }
+
+    const goalSheet = await prisma.goalSheet.update({
+      where: { id: sheet.id },
+      data: { status: "Draft", approvedAt: null }
+    });
+
+    // Unlock all goals and revert them to Draft status so the employee can edit them
+    await prisma.goal.updateMany({
+      where: { goalSheetId: sheet.id },
+      data: { status: "Draft", isLocked: false }
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId: sheet.employeeId,
+        message: `Your goal sheet was returned by ${req.user.name || "your manager"} for rework: ${comment || "Please revise and resubmit."}`
+      }
+    });
+
+    return res.json({ goalSheet });
+  } catch (error) {
+    console.error("Prisma error in returnGoalSheet:", error);
+    const sheet = demoStore.returnGoalSheet(req.body.goalSheetId, req.user.sub, req.body.comment);
+    if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
+    return res.json({ goalSheet: sheet });
+  }
 });

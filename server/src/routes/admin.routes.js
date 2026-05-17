@@ -80,8 +80,40 @@ adminRouter.put("/user/:userId/manager", requireAuth, requireRole("Admin"), asyn
   }
 });
 
-adminRouter.get("/goals", requireAuth, requireRole("Admin"), (_req, res) => {
-  res.json({ goals: demoStore.searchGoals(_req.query.search || "") });
+adminRouter.get("/goals", requireAuth, requireRole("Admin"), async (req, res) => {
+  try {
+    if (req.user.sub?.startsWith("demo-")) {
+      return res.json({ goals: demoStore.searchGoals(req.query.search || "") });
+    }
+    const term = req.query.search || "";
+    const goals = await prisma.goal.findMany({
+      where: {
+        OR: [
+          { title: { contains: term, mode: "insensitive" } },
+          { description: { contains: term, mode: "insensitive" } },
+          { thrustArea: { contains: term, mode: "insensitive" } },
+          { goalSheet: { employee: { name: { contains: term, mode: "insensitive" } } } }
+        ]
+      },
+      include: {
+        goalSheet: {
+          include: {
+            employee: { select: { id: true, name: true, email: true, role: true, department: true } }
+          }
+        }
+      }
+    });
+
+    const formatted = goals.map(({ goalSheet, ...goal }) => ({
+      ...goal,
+      employee: goalSheet.employee
+    }));
+
+    return res.json({ goals: formatted });
+  } catch (error) {
+    console.error("Prisma error in searchGoals:", error);
+    return res.json({ goals: demoStore.searchGoals(req.query.search || "") });
+  }
 });
 
 adminRouter.post("/unlock-goal/:goalId", requireAuth, requireRole("Admin"), async (req, res) => {
@@ -154,6 +186,110 @@ adminRouter.put("/goal/:goalId", requireAuth, requireRole("Manager", "Admin"), a
   }
 });
 
-adminRouter.get("/org", requireAuth, requireRole("Admin"), (_req, res) => {
-  res.json({ org: demoStore.getOrg() });
+adminRouter.get("/org", requireAuth, requireRole("Admin"), async (req, res) => {
+  try {
+    if (req.user.sub?.startsWith("demo-")) {
+      return res.json({ org: demoStore.getOrg() });
+    }
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        managerId: true,
+        department: true,
+        employees: {
+          select: { id: true, name: true, email: true, role: true, managerId: true, department: true }
+        }
+      }
+    });
+
+    const leaders = users.filter((u) => u.role === "Admin" || u.role === "Manager");
+    const formatted = leaders.map((leader) => ({
+      ...leader,
+      reports: leader.employees
+    }));
+
+    return res.json({ org: formatted });
+  } catch (error) {
+    console.error("Prisma error in getOrg:", error);
+    return res.json({ org: demoStore.getOrg() });
+  }
+});
+
+adminRouter.post("/shared-goals", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  try {
+    const { thrustArea, title, description, uomType, target, weightage, targetDepartment } = req.body;
+    
+    // Find matching employees
+    const employees = await prisma.user.findMany({
+      where: {
+        role: "Employee",
+        department: targetDepartment || undefined
+      }
+    });
+
+    if (!employees.length) {
+      return res.status(400).json({ message: "No matching employees found in this department." });
+    }
+
+    const currentYear = new Date().getFullYear();
+
+    // Iterate through all found employees and inject the goal
+    const creations = employees.map(async (emp) => {
+      // Find or create their GoalSheet
+      let sheet = await prisma.goalSheet.findFirst({
+        where: { employeeId: emp.id, cycleYear: currentYear }
+      });
+      if (!sheet) {
+        sheet = await prisma.goalSheet.create({
+          data: {
+            employeeId: emp.id,
+            cycleYear: currentYear,
+            status: "Draft"
+          }
+        });
+      }
+
+      // Check if goal sheet is already approved
+      // If approved, we inject as Active & Locked. If not, inject as Draft & Locked.
+      const status = sheet.status === "Approved" ? "Active" : "Draft";
+
+      // Append goal
+      return prisma.goal.create({
+        data: {
+          goalSheetId: sheet.id,
+          thrustArea,
+          title,
+          description,
+          uomType,
+          target: String(target),
+          weightage: Number(weightage),
+          isShared: true,
+          isLocked: true,
+          status
+        }
+      });
+    });
+
+    await Promise.all(creations);
+
+    // Create notifications for each employee
+    await Promise.all(
+      employees.map((emp) =>
+        prisma.notification.create({
+          data: {
+            userId: emp.id,
+            message: `A corporate shared goal "${title}" has been assigned to your goal sheet by Admin.`
+          }
+        })
+      )
+    );
+
+    return res.json({ success: true, message: `Successfully propagated shared goal to ${employees.length} employees.` });
+  } catch (error) {
+    console.error("Error propagating shared goals:", error);
+    return res.status(500).json({ message: "Failed to propagate shared goals." });
+  }
 });

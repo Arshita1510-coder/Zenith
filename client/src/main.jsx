@@ -19,7 +19,10 @@ import {
   Sun,
   Unlock,
   UserCog,
-  UsersRound
+  UsersRound,
+  AlertTriangle,
+  Info,
+  ChevronDown
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -150,6 +153,167 @@ function chartToPng(containerId, filename) {
   image.src = url;
 }
 
+function PreviewDrawer({ preview, onClose }) {
+  const [activeTab, setActiveTab] = useState("teams");
+  if (!preview) return null;
+
+  return (
+    <div className="drawer-backdrop" onClick={onClose}>
+      <div className="drawer-content p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold flex items-center gap-2">
+              <ShieldCheck size={20} className="text-[#247e57]" />
+              📢 Notification Preview
+            </h3>
+            <p className="text-xs text-[#697789]">Visualizer for Microsoft Teams & SMTP Email notifications</p>
+          </div>
+          <button className="rounded-md border border-[#cfd9cf] px-3 py-1.5 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        {/* Tab Selection */}
+        <div className="mb-6 flex rounded-lg border border-[#dce4d8] bg-slate-50 p-1 dark:bg-slate-900/40">
+          <button
+            className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition ${activeTab === "teams" ? "bg-ink text-white" : "text-[#536272] hover:text-ink"}`}
+            onClick={() => setActiveTab("teams")}
+          >
+            💬 Microsoft Teams (Adaptive Card)
+          </button>
+          <button
+            className={`flex-1 rounded-md py-2 text-center text-xs font-semibold transition ${activeTab === "email" ? "bg-ink text-white" : "text-[#536272] hover:text-ink"}`}
+            onClick={() => setActiveTab("email")}
+          >
+            📧 Responsive HTML Email
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto rounded-lg border border-[#dce4d8] p-4 bg-slate-50/50 dark:bg-slate-900/10">
+          {activeTab === "teams" ? (
+            <div className="teams-client p-4 shadow-md text-left">
+              {/* MS Teams Shell Header */}
+              <div className="mb-4 flex items-center gap-3 border-b border-[#3b3a39] pb-3">
+                <div className="size-8 rounded-full bg-[#4f46e5] flex items-center justify-center font-bold text-white text-xs">
+                  💬
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-white">Microsoft Teams</p>
+                  <p className="text-[10px] text-[#aebaca]">Zenith Integration Bot</p>
+                </div>
+              </div>
+
+              {/* Adaptive Card Simulation */}
+              <div className="adaptive-card rounded-lg p-5">
+                <div className="flex items-start justify-between mb-4 border-b border-[#3b3a39] pb-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-white">Zenith Performance Portal</h4>
+                    <p className="text-[10px] text-[#aebaca]">{preview.type} Notification</p>
+                  </div>
+                  <span className="text-[9px] bg-[#4f46e5]/20 text-[#818cf8] px-2 py-0.5 rounded font-semibold uppercase tracking-wider">Adaptive Card</span>
+                </div>
+
+                <div className="space-y-3 mb-5">
+                  <div className="flex justify-between border-b border-[#3b3a39]/30 pb-2">
+                    <span className="text-xs text-[#aebaca]">Subject:</span>
+                    <span className="text-xs font-semibold text-white">{preview.message}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-[#3b3a39]/30 pb-2">
+                    <span className="text-xs text-[#aebaca]">User Affected:</span>
+                    <span className="text-xs font-semibold text-white">{preview.employeeName}</span>
+                  </div>
+                  {preview.managerName && (
+                    <div className="flex justify-between border-b border-[#3b3a39]/30 pb-2">
+                      <span className="text-xs text-[#aebaca]">Manager:</span>
+                      <span className="text-xs font-semibold text-white">{preview.managerName}</span>
+                    </div>
+                  )}
+                  {preview.comment && (
+                    <div className="rounded bg-black/35 p-3 text-xs border-l-2 border-[#ec6b5f]">
+                      <p className="font-semibold text-white mb-1">Rework/Feedback Comment:</p>
+                      <p className="text-[#aebaca]">{preview.comment}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    className="flex-1 bg-[#4f46e5] text-white rounded py-2 text-xs font-semibold hover:bg-[#4338ca] transition"
+                    onClick={() => {
+                      alert("Hackathon Demo: In a live environment, this action triggers a Microsoft Teams deep-link to open the Zenith portal!");
+                      onClose();
+                    }}
+                  >
+                    View Goal Sheet
+                  </button>
+                  <button 
+                    className="flex-1 border border-[#3b3a39] text-[#aebaca] rounded py-2 text-xs font-semibold hover:bg-white/5 transition"
+                    onClick={() => {
+                      alert("Hackathon Demo: Acknowledgment securely recorded via Microsoft Teams Bot Framework!");
+                      onClose();
+                    }}
+                  >
+                    Acknowledge
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="email-client p-6 shadow-md text-left">
+              <div className="email-body p-6 shadow-sm">
+                {/* Header */}
+                <div className="mb-6 pb-4 border-b border-gray-100 dark:border-gray-700 flex items-center gap-3">
+                  <div className="size-10 bg-[#e6f4ed] text-[#247e57] dark:bg-[#143b2b] dark:text-[#9de2bf] rounded-lg flex items-center justify-center font-bold">
+                    Z
+                  </div>
+                  <div>
+                    <h4 className="text-base font-bold text-gray-900 dark:text-white">Zenith Performance</h4>
+                    <p className="text-[10px] text-gray-400">noreply@zenith-performance.com</p>
+                  </div>
+                </div>
+
+                {/* Email Body */}
+                <div className="space-y-4 text-xs text-gray-600 dark:text-gray-300">
+                  <p className="font-semibold text-gray-900 dark:text-white">Hello,</p>
+                  <p>
+                    Your Zenith transaction has completed successfully. Below are the execution and audit details of the action performed:
+                  </p>
+
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-2.5 border border-slate-100 dark:border-slate-700">
+                    <div className="flex justify-between">
+                      <span className="text-[10px] text-gray-400">Activity Type:</span>
+                      <span className="text-[10px] font-semibold text-gray-900 dark:text-white">{preview.type}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[10px] text-gray-400">Details:</span>
+                      <span className="text-[10px] font-semibold text-gray-900 dark:text-white">{preview.message}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[10px] text-gray-400">Timestamp:</span>
+                      <span className="text-[10px] font-semibold text-gray-900 dark:text-white">{new Date().toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {preview.comment && (
+                    <div className="bg-amber-50/50 dark:bg-amber-950/20 border-l-4 border-amber-400 p-3.5 rounded">
+                      <p className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 mb-1">Feedback/Comments:</p>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400">{preview.comment}</p>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-gray-400 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+                    This is an automated notification from the Zenith Performance Management system. Please do not reply directly to this email.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const storedUser = useMemo(() => {
     const raw = localStorage.getItem("aq_user");
@@ -160,6 +324,7 @@ function App() {
   const [user, setUser] = useState(storedUser);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [activePreview, setActivePreview] = useState(null);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("zenith_dark") === "true");
 
   useEffect(() => {
@@ -202,15 +367,30 @@ function App() {
   }
 
   if (user?.role === "Employee") {
-    return <EmployeeDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    return (
+      <>
+        <EmployeeDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
+        {activePreview ? <PreviewDrawer preview={activePreview} onClose={() => setActivePreview(null)} /> : null}
+      </>
+    );
   }
 
   if (user?.role === "Manager") {
-    return <ManagerDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    return (
+      <>
+        <ManagerDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
+        {activePreview ? <PreviewDrawer preview={activePreview} onClose={() => setActivePreview(null)} /> : null}
+      </>
+    );
   }
 
   if (user?.role === "Admin") {
-    return <AdminDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} />;
+    return (
+      <>
+        <AdminDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
+        {activePreview ? <PreviewDrawer preview={activePreview} onClose={() => setActivePreview(null)} /> : null}
+      </>
+    );
   }
 
   return (
@@ -440,7 +620,7 @@ function bandForScore(score) {
   return "red";
 }
 
-function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
+function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
   const [quarter, setQuarter] = useState("Q1");
   const [dashboard, setDashboard] = useState(null);
   const [forms, setForms] = useState({});
@@ -497,7 +677,8 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
     if (draftGoals.length > 8) return "A goal sheet can include at most 8 goals.";
     if (draftGoals.some((goal) => Number(goal.weightage) < 10)) return "Each goal must have at least 10% weightage.";
     if (draftTotal !== 100) return `Total weightage must equal 100%. Current total is ${draftTotal}%.`;
-    if (draftGoals.some((goal) => !goal.title || !goal.target)) return "Every goal needs a title and target.";
+    const invalidGoalIndex = draftGoals.findIndex((goal) => !goal.title || !goal.target);
+    if (invalidGoalIndex !== -1) return `Goal #${invalidGoalIndex + 1} is missing a title or target.`;
     return "";
   }
 
@@ -523,6 +704,14 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
       const data = await api("/api/goal-sheets/my/submit", { method: "POST", body: JSON.stringify({}) });
       setDashboard(data);
       setMessage("Goal sheet submitted for manager approval. It is read-only until returned.");
+      if (triggerPreview) {
+        triggerPreview({
+          type: "Submission",
+          message: "Annual Goal Sheet submitted for Approval.",
+          employeeName: user.name,
+          managerName: "Morgan Manager"
+        });
+      }
     } catch (error) {
       setValidation(error.message);
     }
@@ -546,24 +735,34 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
           <button className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={readOnly} onClick={submitSheet} type="button">Submit for Approval</button>
         </div>
         <div className="grid gap-4">
-          {draftGoals.map((goal, index) => (
-            <article className="rounded-lg border border-[#dce4d8] bg-white p-4" key={goal.id || index}>
-              <div className="grid gap-3 md:grid-cols-6">
-                <Input label="Title" value={goal.title} onChange={(value) => updateDraft(index, "title", value)} />
-                <Input label="Thrust Area" value={goal.thrustArea} onChange={(value) => updateDraft(index, "thrustArea", value)} />
-                <Select label="UoM" value={goal.uomType} onChange={(value) => updateDraft(index, "uomType", value)} options={[["Min", "Min"], ["Max", "Max"], ["Timeline", "Timeline"], ["Zero", "Zero"]]} />
-                <Input label="Target" type={goal.uomType === "Timeline" ? "date" : "text"} value={goal.target} onChange={(value) => updateDraft(index, "target", value)} />
-                <Input label="Weightage" type="number" value={goal.weightage} onChange={(value) => updateDraft(index, "weightage", value)} />
-                <div className="flex items-end">
-                  <button className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={readOnly || draftGoals.length === 1} onClick={() => setDraftGoals((current) => current.filter((_, goalIndex) => goalIndex !== index))} type="button">Remove</button>
+          {draftGoals.map((goal, index) => {
+            const isSharedGoal = Boolean(goal.isShared);
+            const isFieldDisabled = readOnly || isSharedGoal;
+            return (
+              <article className={`rounded-lg border p-4 transition ${isSharedGoal ? "border-amber-300 bg-amber-50/20" : "border-[#dce4d8] bg-white"}`} key={goal.id || index}>
+                {isSharedGoal && (
+                  <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-300">
+                    <ShieldCheck size={12} />
+                    Shared Corporate KPI (Locked)
+                  </div>
+                )}
+                <div className="grid gap-3 md:grid-cols-6">
+                  <Input label="Title" value={goal.title} onChange={(value) => updateDraft(index, "title", value)} disabled={isFieldDisabled} />
+                  <Input label="Thrust Area" value={goal.thrustArea} onChange={(value) => updateDraft(index, "thrustArea", value)} disabled={isFieldDisabled} />
+                  <Select label="UoM" value={goal.uomType} onChange={(value) => updateDraft(index, "uomType", value)} options={[["Min", "Min"], ["Max", "Max"], ["Timeline", "Timeline"], ["Zero", "Zero"]]} disabled={isFieldDisabled} />
+                  <Input label="Target" type={goal.uomType === "Timeline" ? "date" : "text"} value={goal.target} onChange={(value) => updateDraft(index, "target", value)} disabled={isFieldDisabled} />
+                  <Input label="Weightage" type="number" value={goal.weightage} onChange={(value) => updateDraft(index, "weightage", value)} disabled={isFieldDisabled} />
+                  <div className="flex items-end">
+                    <button className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={isFieldDisabled || draftGoals.length === 1} onClick={() => setDraftGoals((current) => current.filter((_, goalIndex) => goalIndex !== index))} type="button">Remove</button>
+                  </div>
                 </div>
-              </div>
-              <label className="mt-3 block">
-                <span className="mb-2 block text-sm font-medium">Description</span>
-                <textarea className="min-h-20 w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none" disabled={readOnly} value={goal.description} onChange={(event) => updateDraft(index, "description", event.target.value)} />
-              </label>
-            </article>
-          ))}
+                <label className="mt-3 block">
+                  <span className="mb-2 block text-sm font-medium">Description</span>
+                  <textarea className="min-h-20 w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#fbfcf8]" disabled={isFieldDisabled} value={goal.description} onChange={(event) => updateDraft(index, "description", event.target.value)} />
+                </label>
+              </article>
+            );
+          })}
         </div>
       </Shell>
     );
@@ -587,6 +786,9 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
               <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {goal.isShared && (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 border border-amber-300">Shared Corporate KPI</span>
+                    )}
                     <span className="rounded-full bg-[#eef2f6] px-3 py-1 text-xs font-semibold text-[#536272]">{goal.thrustArea}</span>
                     <span className="rounded-full bg-[#e6f4ed] px-3 py-1 text-xs font-semibold text-[#17633f]">{goal.uomType} UoM</span>
                     <span className="rounded-full bg-[#f5eee6] px-3 py-1 text-xs font-semibold text-[#7b5131]">{goal.weightage}% weightage</span>
@@ -671,7 +873,44 @@ function goalToDraft(goal) {
   };
 }
 
-function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
+function ManagerWorkflowGuide() {
+  return (
+    <details className="mb-5 rounded-lg border border-[#3b3a39] bg-[#1a1919] text-[#aebaca] shadow-sm [&_svg.chevron]:open:rotate-180" open>
+      <summary className="flex cursor-pointer items-center justify-between p-4 outline-none">
+        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+          <Info size={16} />
+          Manager Workflow Guide
+        </div>
+        <ChevronDown size={18} className="chevron transition-transform" />
+      </summary>
+      <div className="grid gap-4 border-t border-[#3b3a39] p-4 md:grid-cols-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="flex size-5 items-center justify-center rounded-full bg-[#3b3a39] text-[10px]">1</span>
+            Review Submissions
+          </div>
+          <p className="text-xs">View goal sheets submitted by your direct reports.</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="flex size-5 items-center justify-center rounded-full bg-[#3b3a39] text-[10px]">2</span>
+            Approve or Reject
+          </div>
+          <p className="text-xs">Approve to permanently lock goals, or reject them back for mandatory rework.</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className="flex size-5 items-center justify-center rounded-full bg-[#3b3a39] text-[10px]">3</span>
+            Quarterly Feedback
+          </div>
+          <p className="text-xs">Review Planned vs. Actual progress and add structured check-in comments.</p>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function ManagerDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
   const [view, setView] = useState("team");
   const [quarter, setQuarter] = useState("Q1");
   const [team, setTeam] = useState(null);
@@ -730,6 +969,14 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
       });
       await loadTeam();
       setMessage(`Goal sheet approved for ${report.employee.name}.`);
+      if (triggerPreview) {
+        triggerPreview({
+          type: "Approval",
+          message: "Goal sheet approved successfully.",
+          employeeName: report.employee.name,
+          managerName: user.name
+        });
+      }
     } catch (error) {
       setMessage(error.message);
     }
@@ -738,12 +985,22 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
   async function returnGoalSheet(report) {
     setMessage("");
     try {
+      const comment = returnComments[report.goalSheet.id] || "Please revise and resubmit.";
       await api("/api/checkins/return-goal-sheet", {
         method: "POST",
-        body: JSON.stringify({ goalSheetId: report.goalSheet.id, comment: returnComments[report.goalSheet.id] || "Please revise and resubmit." })
+        body: JSON.stringify({ goalSheetId: report.goalSheet.id, comment })
       });
       await loadTeam();
       setMessage(`Goal sheet returned to ${report.employee.name}.`);
+      if (triggerPreview) {
+        triggerPreview({
+          type: "Return",
+          message: "Goal sheet returned with rework instructions.",
+          employeeName: report.employee.name,
+          managerName: user.name,
+          comment
+        });
+      }
     } catch (error) {
       setMessage(error.message);
     }
@@ -792,6 +1049,7 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
         <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
       </div>
 
+      <ManagerWorkflowGuide />
       {team ? <SummaryBanner quarter={quarter} updated={updated} total={total} window={team.window} /> : null}
       {message ? <p className="mb-5 rounded-md border border-[#dce4d8] bg-white px-4 py-3 text-sm font-medium text-[#536272]">{message}</p> : null}
 
@@ -812,6 +1070,7 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
                 <thead className="bg-[#fbfcf8] text-[#536272]">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Goal</th>
+                    <th className="px-4 py-3 font-semibold">Weightage</th>
                     <th className="px-4 py-3 font-semibold">Planned Target</th>
                     <th className="px-4 py-3 font-semibold">Actual Achievement</th>
                     <th className="px-4 py-3 font-semibold">Progress Score</th>
@@ -822,9 +1081,13 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
                   {report.goals.map((goal) => (
                     <tr key={goal.id}>
                       <td className="px-4 py-3">
-                        <span className="block font-semibold">{goal.title}</span>
+                        <span className="block font-semibold flex items-center gap-1">
+                          {goal.isShared && <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold uppercase">Shared</span>}
+                          {goal.title}
+                        </span>
                         <span className="text-xs text-[#697789]">{goal.uomType} UoM</span>
                       </td>
+                      <td className="px-4 py-3 font-semibold text-slate-700">{goal.weightage}%</td>
                       <td className="px-4 py-3">
                         <div className="flex min-w-44 gap-2">
                           <input className="w-24 rounded-md border border-[#cfd9cf] px-2 py-1" value={targetEdits[goal.id] ?? goal.target} onChange={(event) => setTargetEdits((current) => ({ ...current, [goal.id]: event.target.value }))} />
@@ -848,20 +1111,37 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
               </table>
             </div>
 
-            {report.goalSheet ? (
-              <div className="mt-5 rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <ClipboardCheck size={18} />
-                  <h4 className="font-semibold">Structured check-in record</h4>
-                </div>
-                <div className="mb-4 flex flex-wrap gap-2">
-                <button className="inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold" onClick={() => approveGoalSheet(report)} type="button">
-                  <CheckCircle2 size={16} />
-                  Approve goal sheet
-                </button>
-                <input className="min-w-64 rounded-md border border-[#cfd9cf] px-3 py-2 text-sm" placeholder="Return comment" value={returnComments[report.goalSheet.id] || ""} onChange={(event) => setReturnComments((current) => ({ ...current, [report.goalSheet.id]: event.target.value }))} />
-                <button className="rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold" onClick={() => returnGoalSheet(report)} type="button">Return with Comment</button>
-                </div>
+            {report.goalSheet ? (() => {
+              const totalWeightage = report.goals.reduce((sum, g) => sum + g.weightage, 0);
+              const isValidWeightage = totalWeightage === 100;
+              const isSheetSubmitted = report.goalSheet.status === "Submitted";
+              return (
+                <div className="mt-5 rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-4">
+                  <div className="mb-4 flex items-center gap-2">
+                    <ClipboardCheck size={18} />
+                    <h4 className="font-semibold">Structured check-in record · Weightage: {totalWeightage}%</h4>
+                  </div>
+                  
+                  {isSheetSubmitted && !isValidWeightage && (
+                    <div className="mb-4 rounded-md bg-[#fff1f0] border border-[#efbeb9] p-3 text-xs font-semibold text-[#a13a31] flex items-center gap-2">
+                      <AlertTriangle size={14} />
+                      <span>Cannot approve: Direct reportee's weightages sum to {totalWeightage}%, but must be exactly 100%. Please instruct the employee to adjust weightages.</span>
+                    </div>
+                  )}
+
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    <button 
+                      className="inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50" 
+                      disabled={isSheetSubmitted && !isValidWeightage}
+                      onClick={() => approveGoalSheet(report)} 
+                      type="button"
+                    >
+                      <CheckCircle2 size={16} />
+                      Approve goal sheet
+                    </button>
+                    <input className="min-w-64 rounded-md border border-[#cfd9cf] px-3 py-2 text-sm" placeholder="Return comment" value={returnComments[report.goalSheet.id] || ""} onChange={(event) => setReturnComments((current) => ({ ...current, [report.goalSheet.id]: event.target.value }))} />
+                    <button className="rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold" onClick={() => returnGoalSheet(report)} type="button">Return with Comment</button>
+                  </div>
                 <label className="mb-3 block">
                   <span className="mb-2 block text-sm font-medium">Discussion notes</span>
                   <textarea
@@ -899,7 +1179,8 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
                   Save check-in
                 </button>
               </div>
-            ) : null}
+            );
+          })() : null}
           </article>
         ))}
       </div>
@@ -925,13 +1206,181 @@ function ManagerNav({ view, setView }) {
   );
 }
 
-function AdminDashboard({ user, onLogout, darkMode, setDarkMode }) {
+function SharedGoalsCenter({ currentUser, triggerPreview }) {
+  const [form, setForm] = useState({
+    thrustArea: "Revenue Growth",
+    title: "Accelerate Q3 Revenue Target",
+    description: "Achieve the quarterly sales milestone to ensure healthy SaaS enterprise ARR trajectory.",
+    uomType: "Max",
+    target: "150000",
+    weightage: 20,
+    targetDepartment: "Sales"
+  });
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setMessage("");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const res = await api("/api/admin/shared-goals", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          weightage: Number(form.weightage)
+        })
+      });
+      setMessage(res.message || "Shared corporate goals propagated successfully!");
+      if (triggerPreview) {
+        triggerPreview({
+          type: "Corporate Propagation",
+          message: `Shared KPI "${form.title}" propagated to department ${form.targetDepartment}.`,
+          employeeName: `All members in ${form.targetDepartment}`,
+          managerName: "System Administrator"
+        });
+      }
+    } catch (err) {
+      setError(err.message || "Failed to propagate shared goals.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="glass-card max-w-2xl rounded-xl border border-[#dce4d8] bg-white p-6 shadow-md transition-all hover:shadow-lg">
+      <div className="mb-6">
+        <h3 className="text-xl font-bold flex items-center gap-2 text-[#247e57]">
+          <ShieldCheck size={22} />
+          Shared Corporate Goals Propagation Center
+        </h3>
+        <p className="text-xs text-[#536272] mt-1">
+          Draft and push locked KPI objectives directly into your department's goal sheets.
+        </p>
+      </div>
+
+      {message && (
+        <div className="mb-5 rounded-md bg-[#e6f4ed] border border-[#a3e2c1] p-3.5 text-xs font-semibold text-[#185e3d] flex items-center gap-2">
+          <ShieldCheck size={14} />
+          <span>{message}</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-5 rounded-md bg-[#fff1f0] border border-[#efbeb9] p-3.5 text-xs font-semibold text-[#a13a31] flex items-center gap-2">
+          <AlertTriangle size={14} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">Thrust Area</span>
+            <input
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              required
+              value={form.thrustArea}
+              onChange={(e) => setForm({ ...form, thrustArea: e.target.value })}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">Goal Title</span>
+            <input
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              required
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+          </label>
+        </div>
+
+        <label className="block">
+          <span className="mb-2 block text-xs font-medium">Goal Description</span>
+          <textarea
+            className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none min-h-20"
+            required
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">UoM Type</span>
+            <select
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              value={form.uomType}
+              onChange={(e) => setForm({ ...form, uomType: e.target.value })}
+            >
+              <option value="Min">Min</option>
+              <option value="Max">Max</option>
+              <option value="Timeline">Timeline</option>
+              <option value="Zero">Zero</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">Planned Target</span>
+            <input
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              required
+              type={form.uomType === "Timeline" ? "date" : "text"}
+              value={form.target}
+              onChange={(e) => setForm({ ...form, target: e.target.value })}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">Weightage (%)</span>
+            <input
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              required
+              type="number"
+              min="1"
+              max="100"
+              value={form.weightage}
+              onChange={(e) => setForm({ ...form, weightage: e.target.value })}
+            />
+          </label>
+        </div>
+
+        <label className="block">
+          <span className="mb-2 block text-xs font-medium">Target Department / Group</span>
+          <select
+            className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+            value={form.targetDepartment}
+            onChange={(e) => setForm({ ...form, targetDepartment: e.target.value })}
+          >
+            <option value="Sales">Sales & Business Development</option>
+            <option value="Engineering">Engineering & Operations</option>
+            <option value="Product">Product Management</option>
+            <option value="Marketing">Growth Marketing</option>
+          </select>
+        </label>
+
+        <button
+          className="w-full rounded-md bg-ink hover:opacity-90 py-2.5 text-sm font-semibold text-white transition flex items-center justify-center gap-2 disabled:opacity-50"
+          disabled={isSubmitting}
+          type="submit"
+        >
+          <ShieldCheck size={16} />
+          {isSubmitting ? "Propagating Goals..." : "Propagate Locked Goals to Department"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function AdminDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
   const [view, setView] = useState("overview");
   const nav = [
     ["overview", "Overview", ClipboardCheck],
     ["reports", "Reports", FileSpreadsheet],
     ["escalations", "Escalations", PlayCircle],
     ["analytics", "Analytics", BarChart3],
+    ["shared-goals", "Shared Goals Center", ShieldCheck],
     ["audit", "Audit Log", ShieldCheck],
     ["cycle", "Cycle Management", SlidersHorizontal],
     ["users", "User Management", UserCog]
@@ -971,6 +1420,7 @@ function AdminDashboard({ user, onLogout, darkMode, setDarkMode }) {
           {view === "reports" ? <AchievementReport currentUser={user} /> : null}
           {view === "escalations" ? <EscalationDashboard /> : null}
           {view === "analytics" ? <AnalyticsPage currentUser={user} /> : null}
+          {view === "shared-goals" ? <SharedGoalsCenter currentUser={user} triggerPreview={triggerPreview} /> : null}
           {view === "audit" ? <AuditLogPage /> : null}
           {view === "cycle" ? <CycleManagement /> : null}
           {view === "users" ? <UserManagement /> : null}
