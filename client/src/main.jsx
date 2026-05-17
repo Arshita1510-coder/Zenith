@@ -627,6 +627,8 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
   const [draftGoals, setDraftGoals] = useState([]);
   const [message, setMessage] = useState("");
   const [validation, setValidation] = useState("");
+  const [submitLoading, setSubmitLoading] = useState({});
+  const [submitError, setSubmitError] = useState({});
 
   async function loadDashboard(activeQuarter = quarter) {
     const data = await api(`/api/goal-sheets/my/${activeQuarter}`);
@@ -652,6 +654,8 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
 
   async function submitGoal(goal) {
     setMessage("");
+    setSubmitError((prev) => ({ ...prev, [goal.id]: null }));
+    setSubmitLoading((prev) => ({ ...prev, [goal.id]: true }));
     try {
       await api("/api/achievements", {
         method: "POST",
@@ -665,7 +669,10 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
       await loadDashboard();
       setMessage(`${goal.title} submitted and locked for ${quarter}.`);
     } catch (error) {
+      setSubmitError((prev) => ({ ...prev, [goal.id]: error.message }));
       setMessage(error.message);
+    } finally {
+      setSubmitLoading((prev) => ({ ...prev, [goal.id]: false }));
     }
   }
 
@@ -812,7 +819,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                     <span className="mb-2 block text-sm font-medium">{goal.uomType === "Timeline" ? "Completion date" : "Actual achievement"}</span>
                     <input
                       className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#eef2f6]"
-                      disabled={disabled}
+                      disabled={disabled || submitLoading[goal.id]}
                       onChange={(event) =>
                         setForms((current) => ({ ...current, [goal.id]: { ...current[goal.id], actual: event.target.value } }))
                       }
@@ -824,7 +831,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                     <span className="mb-2 block text-sm font-medium">Status</span>
                     <select
                       className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none disabled:bg-[#eef2f6]"
-                      disabled={disabled}
+                      disabled={disabled || submitLoading[goal.id]}
                       onChange={(event) =>
                         setForms((current) => ({ ...current, [goal.id]: { ...current[goal.id], progressStatus: event.target.value } }))
                       }
@@ -837,14 +844,31 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                       ))}
                     </select>
                   </label>
+                  {submitError[goal.id] && (
+                    <p className="mb-3 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-md animate-in fade-in duration-150">
+                      ⚠️ {submitError[goal.id]}
+                    </p>
+                  )}
                   <button
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={disabled || !forms[goal.id]?.actual}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 transition"
+                    disabled={disabled || !forms[goal.id]?.actual || submitLoading[goal.id]}
                     onClick={() => submitGoal(goal)}
                     type="button"
                   >
-                    <CheckCircle2 size={17} />
-                    Submit update
+                    {submitLoading[goal.id] ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={17} />
+                        Submit update
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
