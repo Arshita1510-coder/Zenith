@@ -45,7 +45,7 @@ import {
 } from "recharts";
 import "./styles.css";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API_URL = import.meta.env.VITE_API_URL || (typeof window !== "undefined" && !window.location.origin.includes("localhost") ? "" : "http://localhost:3001");
 const quarters = ["Q1", "Q2", "Q3", "Q4"];
 const quarterMeta = {
   Q1: { label: "Q1", window: "July", shortWindow: "Jul" },

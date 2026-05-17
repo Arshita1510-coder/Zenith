@@ -65,6 +65,10 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: "Unexpected server error" });
 });
 
-app.listen(port, () => {
-  console.info(`Goal tracking API listening on http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+  app.listen(port, () => {
+    console.info(`Goal tracking API listening on http://localhost:${port}`);
+  });
+}
+
+export default app;

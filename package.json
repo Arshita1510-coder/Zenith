@@ -1,12 +1,23 @@
 {
   "name": "zenith-goal-tracking-portal",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm install --prefix client && npm run build --prefix client",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client",
     "prisma:generate": "npm run prisma:generate --prefix server",
     "prisma:migrate": "npm run prisma:migrate --prefix server",
     "seed": "npm run seed --prefix server"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
