@@ -494,23 +494,26 @@ function NotificationBell({ user }) {
 
   return (
     <div className="relative">
-      <button className="relative rounded-md border border-[#cfd9cf] bg-white p-2" onClick={() => setOpen((current) => !current)} type="button" aria-label="Notifications">
+      <button className="relative rounded-md border border-[#cfd9cf] bg-white p-2 hover:bg-slate-50 transition" onClick={() => setOpen((current) => !current)} type="button" aria-label="Notifications">
         <Bell size={18} />
-        {unread ? <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#ec6b5f] text-xs font-bold text-white">{unread}</span> : null}
+        {unread ? <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#ec6b5f] text-xs font-bold text-white animate-bounce">{unread}</span> : null}
       </button>
       {open ? (
-        <div className="absolute right-0 z-40 mt-2 w-80 rounded-lg border border-[#dce4d8] bg-white p-3 shadow-xl">
-          <p className="mb-2 text-sm font-semibold">Notifications</p>
-          <div className="grid max-h-80 gap-2 overflow-y-auto">
+        <div className="absolute left-0 z-50 mt-2 w-80 rounded-xl border border-[#dce4d8] bg-white p-4 shadow-xl shadow-[#dce8df]/60 transition-all">
+          <div className="flex items-center justify-between border-b border-[#edf1eb] pb-2 mb-3">
+            <p className="text-sm font-bold text-slate-800">Notifications</p>
+            {unread > 0 && <span className="text-[10px] bg-[#e6f4ed] text-[#247e57] px-2 py-0.5 rounded-full font-semibold">{unread} new</span>}
+          </div>
+          <div className="grid max-h-80 gap-2 overflow-y-auto pr-1">
             {notifications.length ? (
               notifications.slice(0, 6).map((notification) => (
-                <button className={`rounded-md p-3 text-left text-sm ${notification.isRead ? "bg-[#f7f8f4] text-[#697789]" : "bg-[#e6f4ed] text-ink"}`} key={notification.id} onClick={() => markRead(notification)} type="button">
-                  {notification.message}
-                  <span className="mt-1 block text-xs text-[#697789]">{new Date(notification.createdAt).toLocaleString()}</span>
+                <button className={`rounded-lg p-3 text-left text-xs transition border ${notification.isRead ? "bg-[#f7f8f4] text-[#697789] border-transparent" : "bg-[#e6f4ed] text-ink border-[#a3e2c1] hover:border-[#86d7ab]"}`} key={notification.id} onClick={() => markRead(notification)} type="button">
+                  <p className="leading-relaxed font-medium">{notification.message}</p>
+                  <span className="mt-2 block text-[10px] text-[#697789]">{new Date(notification.createdAt).toLocaleString()}</span>
                 </button>
               ))
             ) : (
-              <p className="rounded-md bg-[#f7f8f4] p-3 text-sm text-[#697789]">No notifications.</p>
+              <p className="rounded-lg bg-[#f7f8f4] p-4 text-center text-xs text-[#697789]">No notifications.</p>
             )}
           </div>
         </div>
