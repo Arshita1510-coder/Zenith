@@ -237,7 +237,13 @@ export const demoStore = {
   },
 
   async verifyPassword(user, password) {
-    return password === demoPassword || bcrypt.compare(password, user.passwordHash || "");
+    if (password === demoPassword) return true;
+    if (!user || !user.passwordHash) return false;
+    try {
+      return await bcrypt.compare(password, user.passwordHash);
+    } catch (e) {
+      return false;
+    }
   },
 
   publicUser,

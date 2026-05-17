@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 
-const jwtSecret = process.env.JWT_SECRET;
+const jwtSecret = process.env.JWT_SECRET || "zenith-hackathon-super-secret-key-fallback-2026";
 
 export function signAuthToken(user) {
   return jwt.sign(
