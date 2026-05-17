@@ -851,7 +851,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                   )}
                   <button
                     className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 transition"
-                    disabled={disabled || !forms[goal.id]?.actual || submitLoading[goal.id]}
+                    disabled={disabled || forms[goal.id]?.actual === undefined || forms[goal.id]?.actual === null || forms[goal.id]?.actual === "" || submitLoading[goal.id]}
                     onClick={() => submitGoal(goal)}
                     type="button"
                   >
@@ -1231,18 +1231,53 @@ function ManagerNav({ view, setView }) {
 }
 
 function SharedGoalsCenter({ currentUser, triggerPreview }) {
+  const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState({
-    thrustArea: "Revenue Growth",
-    title: "Accelerate Q3 Revenue Target",
-    description: "Achieve the quarterly sales milestone to ensure healthy SaaS enterprise ARR trajectory.",
-    uomType: "Max",
-    target: "150000",
-    weightage: 20,
-    targetDepartment: "Sales"
+    thrustArea: "Business",
+    title: "",
+    description: "",
+    uomType: "Min",
+    target: "",
+    weightage: 10,
+    assignees: [],
+    primaryOwnerId: ""
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    async function fetchEmployees() {
+      try {
+        const data = await api("/api/admin/users");
+        const filtered = data.users.filter((u) => u.role === "Employee");
+        setEmployees(filtered);
+        setForm((f) => ({
+          ...f,
+          assignees: filtered.map((e) => e.id)
+        }));
+      } catch (err) {
+        console.error("Failed to load employees for shared goals:", err);
+      }
+    }
+    fetchEmployees();
+  }, []);
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setForm({ ...form, assignees: employees.map((e) => e.id) });
+    } else {
+      setForm({ ...form, assignees: [] });
+    }
+  };
+
+  const handleToggleAssignee = (id) => {
+    if (form.assignees.includes(id)) {
+      setForm({ ...form, assignees: form.assignees.filter((aid) => aid !== id) });
+    } else {
+      setForm({ ...form, assignees: [...form.assignees, id] });
+    }
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -1250,23 +1285,42 @@ function SharedGoalsCenter({ currentUser, triggerPreview }) {
     setError("");
     setIsSubmitting(true);
 
+    if (form.assignees.length === 0) {
+      setError("Please select at least one assignee.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const res = await api("/api/admin/shared-goals", {
         method: "POST",
         body: JSON.stringify({
-          ...form,
-          weightage: Number(form.weightage)
+          thrustArea: form.thrustArea,
+          title: form.title,
+          description: form.description,
+          uomType: form.uomType,
+          target: form.target,
+          weightage: Number(form.weightage),
+          assignees: form.assignees,
+          primaryOwnerId: form.primaryOwnerId || null
         })
       });
       setMessage(res.message || "Shared corporate goals propagated successfully!");
       if (triggerPreview) {
         triggerPreview({
           type: "Corporate Propagation",
-          message: `Shared KPI "${form.title}" propagated to department ${form.targetDepartment}.`,
-          employeeName: `All members in ${form.targetDepartment}`,
+          message: `Shared KPI "${form.title}" propagated to ${form.assignees.length} employees.`,
+          employeeName: `${form.assignees.length} selected employees`,
           managerName: "System Administrator"
         });
       }
+      // Reset title and target but keep other options
+      setForm((f) => ({
+        ...f,
+        title: "",
+        description: "",
+        target: ""
+      }));
     } catch (err) {
       setError(err.message || "Failed to propagate shared goals.");
     } finally {
@@ -1279,15 +1333,15 @@ function SharedGoalsCenter({ currentUser, triggerPreview }) {
       <div className="mb-6">
         <h3 className="text-xl font-bold flex items-center gap-2 text-[#247e57]">
           <ShieldCheck size={22} />
-          Shared Corporate Goals Propagation Center
+          Push shared goal
         </h3>
-        <p className="text-xs text-[#536272] mt-1">
-          Draft and push locked KPI objectives directly into your department's goal sheets.
+        <p className="text-xs text-[#536272] mt-1 leading-relaxed">
+          Assign a forced KPI to selected employees. Title and target are locked on their goal sheet; they can adjust weightage only (must still total 100% before submit).
         </p>
       </div>
 
       {message && (
-        <div className="mb-5 rounded-md bg-[#e6f4ed] border border-[#a3e2c1] p-3.5 text-xs font-semibold text-[#185e3d] flex items-center gap-2">
+        <div className="mb-5 rounded-md bg-[#e6f4ed] border border-[#a3e2c1] p-3.5 text-xs font-semibold text-[#185e3d] flex items-center gap-2 animate-pulse">
           <ShieldCheck size={14} />
           <span>{message}</span>
         </div>
@@ -1301,97 +1355,148 @@ function SharedGoalsCenter({ currentUser, triggerPreview }) {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div>
           <label className="block">
-            <span className="mb-2 block text-xs font-medium">Thrust Area</span>
+            <span className="mb-2 block text-xs font-medium">Title</span>
             <input
-              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
               required
-              value={form.thrustArea}
-              onChange={(e) => setForm({ ...form, thrustArea: e.target.value })}
-            />
-          </label>
-          <label className="block">
-            <span className="mb-2 block text-xs font-medium">Goal Title</span>
-            <input
-              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
-              required
+              placeholder="KPI title"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
           </label>
         </div>
 
-        <label className="block">
-          <span className="mb-2 block text-xs font-medium">Goal Description</span>
-          <textarea
-            className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none min-h-20"
-            required
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-        </label>
-
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div>
           <label className="block">
-            <span className="mb-2 block text-xs font-medium">UoM Type</span>
+            <span className="mb-2 block text-xs font-medium">Description (optional)</span>
+            <textarea
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none min-h-20 bg-white"
+              placeholder="Brief description"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">Thrust area</span>
             <select
-              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
-              value={form.uomType}
-              onChange={(e) => setForm({ ...form, uomType: e.target.value })}
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+              value={form.thrustArea}
+              onChange={(e) => setForm({ ...form, thrustArea: e.target.value })}
             >
-              <option value="Min">Min</option>
-              <option value="Max">Max</option>
-              <option value="Timeline">Timeline</option>
-              <option value="Zero">Zero</option>
+              <option value="Business">Business</option>
+              <option value="Customer">Customer</option>
+              <option value="Operations">Operations</option>
+              <option value="People">People</option>
+              <option value="Compliance">Compliance</option>
             </select>
           </label>
           <label className="block">
-            <span className="mb-2 block text-xs font-medium">Planned Target</span>
+            <span className="mb-2 block text-xs font-medium">UoM</span>
+            <select
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+              value={form.uomType}
+              onChange={(e) => setForm({ ...form, uomType: e.target.value })}
+            >
+              <option value="Min">Number</option>
+              <option value="Max">Percentage</option>
+              <option value="Timeline">Timeline</option>
+              <option value="Zero">Zero-based</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">Target</span>
             <input
-              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
               required
+              placeholder="e.g. 95, 2026-12-31, 0"
               type={form.uomType === "Timeline" ? "date" : "text"}
               value={form.target}
               onChange={(e) => setForm({ ...form, target: e.target.value })}
             />
           </label>
           <label className="block">
-            <span className="mb-2 block text-xs font-medium">Weightage (%)</span>
+            <span className="mb-2 block text-xs font-medium">Default weightage (%)</span>
             <input
-              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
               required
               type="number"
-              min="1"
+              min="10"
               max="100"
+              placeholder="10-100"
               value={form.weightage}
               onChange={(e) => setForm({ ...form, weightage: e.target.value })}
             />
           </label>
         </div>
 
-        <label className="block">
-          <span className="mb-2 block text-xs font-medium">Target Department / Group</span>
-          <select
-            className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none"
-            value={form.targetDepartment}
-            onChange={(e) => setForm({ ...form, targetDepartment: e.target.value })}
-          >
-            <option value="Sales">Sales & Business Development</option>
-            <option value="Engineering">Engineering & Operations</option>
-            <option value="Product">Product Management</option>
-            <option value="Marketing">Growth Marketing</option>
-          </select>
-        </label>
+        <div className="space-y-2 border-t border-[#edf1eb] pt-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#536272]">Assign to</span>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-[#247e57] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.assignees.length === employees.length && employees.length > 0}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                className="rounded border-[#cfd9cf]"
+              />
+              Select all
+            </label>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-3 max-h-36 overflow-y-auto">
+            {employees.length > 0 ? (
+              employees.map((emp) => (
+                <label key={emp.id} className="flex items-center gap-2 text-sm text-ink cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 p-1 rounded transition">
+                  <input
+                    type="checkbox"
+                    checked={form.assignees.includes(emp.id)}
+                    onChange={() => handleToggleAssignee(emp.id)}
+                    className="rounded border-[#cfd9cf] text-[#247e57]"
+                  />
+                  <span>{emp.name} <span className="text-xs text-[#7a8795]">({emp.department || "General"})</span></span>
+                </label>
+              ))
+            ) : (
+              <p className="text-xs text-[#7a8795] col-span-2">No employees found.</p>
+            )}
+          </div>
+        </div>
 
-        <button
-          className="w-full rounded-md bg-ink hover:opacity-90 py-2.5 text-sm font-semibold text-white transition flex items-center justify-center gap-2 disabled:opacity-50"
-          disabled={isSubmitting}
-          type="submit"
-        >
-          <ShieldCheck size={16} />
-          {isSubmitting ? "Propagating Goals..." : "Propagate Locked Goals to Department"}
-        </button>
+        <div className="pt-2">
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium">Primary owner</span>
+            <select
+              className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+              value={form.primaryOwnerId}
+              onChange={(e) => setForm({ ...form, primaryOwnerId: e.target.value })}
+            >
+              <option value="">Unassigned</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="pt-4">
+          <button
+            className="w-full rounded-md bg-ink hover:opacity-90 py-2.5 text-sm font-semibold text-white transition flex items-center justify-center gap-2 disabled:opacity-50"
+            disabled={isSubmitting}
+            type="submit"
+          >
+            <ShieldCheck size={16} />
+            {isSubmitting ? "Propagating Goals..." : "Push shared goal"}
+          </button>
+        </div>
       </form>
     </div>
   );
@@ -2040,7 +2145,18 @@ function UserManagement() {
                   <td className="border-b border-[#edf1eb] px-3 py-2">{user.role}</td>
                   <td className="border-b border-[#edf1eb] px-3 py-2">
                     {user.role === "Employee" ? (
-                      <select className="rounded-md border border-[#cfd9cf] px-2 py-1" value={user.managerId || ""} onChange={(event) => setConfirm({ title: "Change reporting manager?", body: "This admin action updates the org hierarchy and is audit logged.", action: () => reassign(user.id, event.target.value) })}>
+                      <select 
+                        className="rounded-md border border-[#cfd9cf] px-2 py-1 bg-white" 
+                        value={user.managerId || ""} 
+                        onChange={(event) => {
+                          const nextManagerId = event.target.value;
+                          setConfirm({ 
+                            title: "Change reporting manager?", 
+                            body: "This admin action updates the org hierarchy and is audit logged.", 
+                            action: () => reassign(user.id, nextManagerId) 
+                          });
+                        }}
+                      >
                         <option value="">Unassigned</option>
                         {managers.map((manager) => <option key={manager.id} value={manager.id}>{manager.name}</option>)}
                       </select>

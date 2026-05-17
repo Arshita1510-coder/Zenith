@@ -726,5 +726,54 @@ export const demoStore = {
     return users
       .filter((user) => user.role !== "Employee")
       .map((leader) => ({ ...publicUser(leader), reports: users.filter((user) => user.managerId === leader.id).map(publicUser) }));
+  },
+
+  propagateSharedGoal({ thrustArea, title, description, uomType, target, weightage, assignees, primaryOwnerId }, actorId) {
+    const emps = users.filter((user) => user.role === "Employee" && (!assignees || assignees.length === 0 || assignees.includes(user.id)));
+    if (!emps.length) {
+      throw new Error("No matching employees found.");
+    }
+
+    emps.forEach((emp) => {
+      let sheet = goalSheets.find((item) => item.employeeId === emp.id && item.cycleYear === activeCycleYear);
+      if (!sheet) {
+        sheet = {
+          id: `goalsheet-${emp.id}-${activeCycleYear}`,
+          employeeId: emp.id,
+          cycleYear: activeCycleYear,
+          status: "Draft",
+          submittedAt: null,
+          approvedAt: null,
+          managerComment: ""
+        };
+        goalSheets.push(sheet);
+      }
+
+      const status = sheet.status === "Approved" ? "Active" : "Draft";
+      goals.push({
+        id: `${emp.id}-goal-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        goalSheetId: sheet.id,
+        thrustArea,
+        title,
+        description: description || "",
+        uomType,
+        target: String(target),
+        weightage: Number(weightage),
+        isShared: true,
+        isLocked: true,
+        status,
+        primaryOwnerId: primaryOwnerId || null
+      });
+
+      notifications.push({
+        id: `notif-shared-${notifications.length + 1}`,
+        userId: emp.id,
+        message: `A corporate shared goal "${title}" has been assigned to your goal sheet by Admin.`,
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+    });
+
+    return { success: true, message: `Successfully propagated shared goal to ${emps.length} employees.` };
   }
 };

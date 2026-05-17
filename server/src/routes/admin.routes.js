@@ -224,18 +224,28 @@ adminRouter.get("/org", requireAuth, requireRole("Admin"), async (req, res) => {
 
 adminRouter.post("/shared-goals", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
   try {
-    const { thrustArea, title, description, uomType, target, weightage, targetDepartment } = req.body;
+    const { thrustArea, title, description, uomType, target, weightage, targetDepartment, assignees, primaryOwnerId } = req.body;
     
     // Find matching employees
-    const employees = await prisma.user.findMany({
-      where: {
-        role: "Employee",
-        department: targetDepartment || undefined
-      }
-    });
+    let employees = [];
+    if (assignees && assignees.length > 0) {
+      employees = await prisma.user.findMany({
+        where: {
+          id: { in: assignees },
+          role: "Employee"
+        }
+      });
+    } else {
+      employees = await prisma.user.findMany({
+        where: {
+          role: "Employee",
+          department: targetDepartment || undefined
+        }
+      });
+    }
 
     if (!employees.length) {
-      return res.status(400).json({ message: "No matching employees found in this department." });
+      return res.status(400).json({ message: "No matching employees found." });
     }
 
     const currentYear = new Date().getFullYear();
@@ -266,7 +276,7 @@ adminRouter.post("/shared-goals", requireAuth, requireRole("Admin", "Manager"), 
           goalSheetId: sheet.id,
           thrustArea,
           title,
-          description,
+          description: description || "",
           uomType,
           target: String(target),
           weightage: Number(weightage),
@@ -293,7 +303,13 @@ adminRouter.post("/shared-goals", requireAuth, requireRole("Admin", "Manager"), 
 
     return res.json({ success: true, message: `Successfully propagated shared goal to ${employees.length} employees.` });
   } catch (error) {
-    console.error("Error propagating shared goals:", error);
-    return res.status(500).json({ message: "Failed to propagate shared goals." });
+    console.error("Error propagating shared goals, falling back to demo store:", error);
+    try {
+      const result = demoStore.propagateSharedGoal(req.body, req.user.sub);
+      return res.json(result);
+    } catch (demoError) {
+      console.error("Demo store propagation failed:", demoError);
+      return res.status(500).json({ message: "Failed to propagate shared goals." });
+    }
   }
 });
