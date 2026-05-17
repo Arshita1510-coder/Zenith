@@ -38,6 +38,23 @@ authRouter.post("/login", loginRateLimit, async (req, res, next) => {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
+    // Try live Prisma database first
+    try {
+      const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+      if (user) {
+        const isValid = await bcrypt.compare(password, user.passwordHash);
+        if (isValid) {
+          const token = signAuthToken(user);
+          return res.json({ token, user: publicUser(user) });
+        } else {
+          return res.status(401).json({ message: "Invalid email or password" });
+        }
+      }
+    } catch (dbError) {
+      console.warn("Database connection issue, trying demoStore fallback...", dbError.message);
+    }
+
+    // Fall back to in-memory demoStore if user not in DB or DB connection failed
     const demoUser = await demoStore.findUserByEmail(email || "");
     const isDemoValid = demoUser ? await demoStore.verifyPassword(demoUser, password || "") : false;
     if (isDemoValid) {
@@ -45,15 +62,7 @@ authRouter.post("/login", loginRateLimit, async (req, res, next) => {
       return res.json({ token, user: demoStore.publicUser(demoUser), mode: "demo-memory" });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    const isValid = user ? await bcrypt.compare(password, user.passwordHash) : false;
-
-    if (!isValid) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    const token = signAuthToken(user);
-    return res.json({ token, user: publicUser(user) });
+    return res.status(401).json({ message: "Invalid email or password" });
   } catch (error) {
     const user = await demoStore.findUserByEmail(req.body.email || "");
     const isValid = user ? await demoStore.verifyPassword(user, req.body.password || "") : false;
