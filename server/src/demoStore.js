@@ -412,6 +412,7 @@ export const demoStore = {
     const goal = goals.find((item) => item.id === goalId);
     if (!goal) return null;
     const previous = goal.isLocked;
+    goal.isLocked = false;
     this.unlockAchievement({ goalId });
     addAuditLog({
       changedBy,

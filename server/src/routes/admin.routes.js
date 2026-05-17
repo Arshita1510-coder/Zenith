@@ -132,8 +132,12 @@ adminRouter.post("/unlock-goal/:goalId", requireAuth, requireRole("Admin"), asyn
         changeDescription: "Admin unlocked a goal"
       }
     });
+    const updatedGoal = await prisma.goal.update({
+      where: { id: goal.id },
+      data: { isLocked: false }
+    });
     await prisma.achievement.updateMany({ where: { goalId: goal.id }, data: { isLocked: false } });
-    return res.json({ goal });
+    return res.json({ goal: updatedGoal });
   } catch {
     const goal = demoStore.unlockGoal(req.params.goalId, req.user.sub);
     if (!goal) return res.status(404).json({ message: "Goal not found" });

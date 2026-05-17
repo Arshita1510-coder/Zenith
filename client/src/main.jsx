@@ -1948,13 +1948,57 @@ function UserManagement() {
         </label>
         <div className="grid gap-3">
           {goals.slice(0, 5).map((goal) => (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#edf1eb] p-3" key={goal.id}>
-              <div>
-                <p className="font-semibold">{goal.employee.name} · {goal.title}</p>
-                <p className="text-sm text-[#697789]">{goal.thrustArea} · {goal.uomType}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#edf1eb] p-3 hover:bg-slate-50 transition" key={goal.id}>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-800">{goal.employee.name}</span>
+                    <span className="text-[#a1b0c0] font-light">·</span>
+                    <span className="text-slate-600 font-medium">{goal.title}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-[#697789]">{goal.thrustArea}</span>
+                    <span className="text-[#a1b0c0] font-light">·</span>
+                    <span className="text-xs text-[#697789]">{goal.uomType} UoM</span>
+                    <span className="text-[#a1b0c0] font-light">·</span>
+                    {goal.isLocked ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        <LockKeyhole size={10} /> Locked
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-[10px] font-bold text-green-700">
+                        <Unlock size={10} /> Unlocked
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <button className="inline-flex items-center gap-2 rounded-md bg-ink px-3 py-2 text-sm font-semibold text-white" onClick={() => setConfirm({ title: "Are you sure you want to unlock this goal?", body: "This will be logged in the audit trail automatically.", action: () => unlockGoal(goal) })} type="button">
-                <Unlock size={16} /> Unlock
+              <button 
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition ${
+                  goal.isLocked 
+                    ? "bg-ink hover:bg-ink/90 text-white" 
+                    : "bg-green-50 text-green-700 border border-green-200 cursor-not-allowed"
+                }`} 
+                onClick={() => {
+                  if (!goal.isLocked) return;
+                  setConfirm({ 
+                    title: "Are you sure you want to unlock this goal?", 
+                    body: "This will unlock all quarterly achievements for this goal and record it in the audit trail.", 
+                    action: () => unlockGoal(goal) 
+                  });
+                }} 
+                disabled={!goal.isLocked}
+                type="button"
+              >
+                {goal.isLocked ? (
+                  <>
+                    <Unlock size={14} /> Unlock
+                  </>
+                ) : (
+                  <>
+                    <Unlock size={14} /> Unlocked
+                  </>
+                )}
               </button>
             </div>
           ))}
@@ -2071,18 +2115,52 @@ function StatusDot({ done }) {
 }
 
 function ConfirmModal({ confirm, onClose }) {
+  const [loading, setLoading] = useState(false);
+
   async function run() {
-    await confirm.action();
-    onClose();
+    if (loading) return;
+    setLoading(true);
+    try {
+      await confirm.action();
+    } catch (err) {
+      console.error("Action failed:", err);
+      alert(err.message || "An error occurred.");
+    } finally {
+      setLoading(false);
+      onClose();
+    }
   }
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <h3 className="text-xl font-semibold">{confirm.title}</h3>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 px-4 backdrop-blur-[1px]">
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+        <h3 className="text-xl font-semibold text-slate-900">{confirm.title}</h3>
         <p className="mt-3 leading-7 text-[#586575]">{confirm.body}</p>
         <div className="mt-6 flex justify-end gap-3">
-          <button className="rounded-md border border-[#cfd9cf] px-4 py-2 text-sm font-semibold" onClick={onClose} type="button">Cancel</button>
-          <button className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={run} type="button">Confirm</button>
+          <button 
+            className="rounded-md border border-[#cfd9cf] px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition" 
+            onClick={onClose} 
+            disabled={loading}
+            type="button"
+          >
+            Cancel
+          </button>
+          <button 
+            className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-ink/90 disabled:opacity-75 transition min-w-[90px] justify-center" 
+            onClick={run} 
+            disabled={loading}
+            type="button"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </>
+            ) : "Confirm"}
+          </button>
         </div>
       </div>
     </div>
