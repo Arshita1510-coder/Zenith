@@ -14,6 +14,11 @@ function paginate(rows, page = 1, pageSize = 25) {
 
 reportsRouter.get("/achievement", requireAuth, requireRole("Manager", "Admin"), async (req, res) => {
   try {
+    if (req.user.sub?.startsWith("demo-")) {
+      const scopedManagerId = req.user.role === "Manager" ? req.user.sub : req.query.managerId;
+      const rows = demoStore.getReportRows({ quarter: req.query.quarter, managerId: scopedManagerId, status: req.query.status });
+      return res.json(paginate(rows, req.query.page, req.query.pageSize));
+    }
     const { quarter, managerId, status, page, pageSize } = req.query;
     const scopedManagerId = req.user.role === "Manager" ? req.user.sub : managerId || undefined;
     const sheets = await prisma.goalSheet.findMany({
@@ -56,6 +61,9 @@ reportsRouter.get("/achievement", requireAuth, requireRole("Manager", "Admin"), 
 
 reportsRouter.get("/completion", requireAuth, requireRole("Manager", "Admin"), async (req, res) => {
   try {
+    if (req.user.sub?.startsWith("demo-")) {
+      return res.json(demoStore.getCompletion({ managerId: req.user.role === "Manager" ? req.user.sub : undefined }));
+    }
     const managerId = req.user.role === "Manager" ? req.user.sub : undefined;
     const employees = await prisma.user.findMany({
       where: { role: "Employee", managerId },

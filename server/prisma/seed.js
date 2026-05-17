@@ -66,11 +66,12 @@ async function main() {
     )
   );
 
-  console.table([
+  console.info("Seeded demo users:");
+  [
     { role: employee.role, email: employee.email, password: demoPassword, manager: manager.email },
     { role: manager.role, email: manager.email, password: demoPassword },
     { role: admin.role, email: admin.email, password: demoPassword }
-  ]);
+  ].forEach((user) => console.info(`${user.role}: ${user.email} / ${user.password}`));
 }
 
 async function seedGoalsForEmployee(employee) {

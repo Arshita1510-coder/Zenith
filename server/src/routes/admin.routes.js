@@ -61,6 +61,7 @@ adminRouter.put("/cycle", requireAuth, requireRole("Admin"), async (req, res) =>
 
 adminRouter.get("/users", requireAuth, requireRole("Admin"), async (_req, res) => {
   try {
+    if (_req.user.sub?.startsWith("demo-")) return res.json({ users: demoStore.getUsers() });
     const users = await prisma.user.findMany({ select: { id: true, name: true, email: true, role: true, managerId: true } });
     return res.json({ users });
   } catch {

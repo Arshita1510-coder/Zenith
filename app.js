@@ -449,8 +449,7 @@ function addNotification(userId, type, message) {
 
 function logDemoEmail(to, subject, body) {
   const previewId = Math.random().toString(36).slice(2, 10);
-  console.log(`[Ethereal demo email preview] https://ethereal.email/message/${previewId}`);
-  console.log({ to, subject, body });
+  console.info(`[Ethereal demo email preview] https://ethereal.email/message/${previewId}`);
 }
 
 function addEscalation(userId, type, triggeredAt, sourceKey) {

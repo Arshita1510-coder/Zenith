@@ -13,6 +13,10 @@ checkInsRouter.get("/team/:managerId/:quarter", requireAuth, requireRole("Manage
       return res.status(403).json({ message: "Managers can only view their own team" });
     }
 
+    if (req.user.sub?.startsWith("demo-")) {
+      return res.json(demoStore.getTeamDashboard(managerId, quarter));
+    }
+
     const reportees = await prisma.user.findMany({
       where: { managerId },
       select: { id: true, name: true, email: true, role: true, managerId: true }
@@ -22,7 +26,7 @@ checkInsRouter.get("/team/:managerId/:quarter", requireAuth, requireRole("Manage
     const dashboards = await Promise.all(
       reportees.map(async (employee) => {
         const sheet = await prisma.goalSheet.findFirst({
-          where: { employeeId: employee.id, status: "Approved" },
+          where: { employeeId: employee.id },
           include: {
             goals: { where: { isLocked: true }, include: { achievements: { where: { quarter } } } },
             checkIns: { where: { managerId, quarter } }
@@ -107,11 +111,17 @@ checkInsRouter.post("/approve-goal-sheet", requireAuth, requireRole("Manager"), 
         message: `Your goal sheet has been approved by ${req.user.name || "your manager"}`
       }
     });
-    console.log("Ethereal preview URL: https://ethereal.email/message/demo-goal-approval-preview");
+    console.info("Ethereal preview URL: https://ethereal.email/message/demo-goal-approval-preview");
     return res.json({ goalSheet });
   } catch {
     const sheet = demoStore.approveGoalSheet(req.body.goalSheetId, req.user.sub);
     if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
     return res.json({ goalSheet: sheet });
   }
+});
+
+checkInsRouter.post("/return-goal-sheet", requireAuth, requireRole("Manager"), (req, res) => {
+  const sheet = demoStore.returnGoalSheet(req.body.goalSheetId, req.user.sub, req.body.comment);
+  if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
+  return res.json({ goalSheet: sheet });
 });

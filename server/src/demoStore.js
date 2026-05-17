@@ -25,13 +25,16 @@ const goalSheets = employeeUsers.map((employee) => ({
   id: `goalsheet-${employee.id}-2026`,
   employeeId: employee.id,
   cycleYear: 2026,
-  status: employee.id === "demo-employee-3" ? "Draft" : employee.id === "demo-employee" ? "Submitted" : "Approved",
-  submittedAt: employee.id === "demo-employee-3" ? null : "2026-04-20T10:00:00.000Z",
-  approvedAt: employee.id === "demo-employee-2" ? "2026-04-25T10:00:00.000Z" : null
+  status: employee.id === "demo-employee" ? "Draft" : employee.id === "demo-employee-3" ? "Submitted" : "Approved",
+  submittedAt: employee.id === "demo-employee" ? null : "2026-04-20T10:00:00.000Z",
+  approvedAt: employee.id === "demo-employee-2" ? "2026-04-25T10:00:00.000Z" : null,
+  managerComment: ""
 }));
 
 const goals = goalSheets.flatMap((sheet) =>
-  goalTemplates.map(([thrustArea, title, description, uomType, target, weightage], index) => ({
+  sheet.employeeId === "demo-employee"
+    ? []
+    : goalTemplates.map(([thrustArea, title, description, uomType, target, weightage], index) => ({
     id: `${sheet.employeeId}-goal-${index + 1}`,
     goalSheetId: sheet.id,
     thrustArea,
@@ -142,19 +145,35 @@ function goalWithAchievement(goal, quarter) {
   };
 }
 
+function sheetPayload(sheet, quarter = "Q1") {
+  const employee = users.find((user) => user.id === sheet.employeeId);
+  const manager = users.find((user) => user.id === employee?.managerId);
+  const sheetGoals = goals.filter((goal) => goal.goalSheetId === sheet.id).map((goal) => goalWithAchievement(goal, quarter));
+  return {
+    employee: publicUser(employee),
+    manager: manager ? publicUser(manager) : null,
+    goalSheet: sheet,
+    quarter,
+    window: windows.find((window) => window.quarter === quarter),
+    summary: { updatedGoals: sheetGoals.filter((goal) => goal.achievement).length, totalGoals: sheetGoals.length },
+    goals: sheetGoals
+  };
+}
+
 function dashboardForEmployee(employeeId, quarter) {
   const sheet = goalSheets.find((item) => item.employeeId === employeeId && item.cycleYear === activeCycleYear);
   if (!sheet) return null;
 
-  const preparedGoals = goals.filter((goal) => goal.goalSheetId === sheet.id && goal.isLocked).map((goal) => goalWithAchievement(goal, quarter));
-  return {
-    employee: publicUser(users.find((user) => user.id === employeeId)),
-    goalSheet: sheet,
-    quarter,
-    window: windows.find((window) => window.quarter === quarter),
-    summary: { updatedGoals: preparedGoals.filter((goal) => goal.achievement).length, totalGoals: preparedGoals.length },
-    goals: preparedGoals
-  };
+  return sheetPayload(sheet, quarter);
+}
+
+function validateGoalSheet(goalsToValidate) {
+  if (!goalsToValidate.length) return "Add at least one goal before submitting.";
+  if (goalsToValidate.length > 8) return "A goal sheet can include at most 8 goals.";
+  if (goalsToValidate.some((goal) => Number(goal.weightage) < 10)) return "Each goal must have at least 10% weightage.";
+  const total = goalsToValidate.reduce((sum, goal) => sum + Number(goal.weightage || 0), 0);
+  if (total !== 100) return `Total weightage must equal 100%. Current total is ${total}%.`;
+  return "";
 }
 
 function reportRows({ quarter, managerId, status }) {
@@ -252,6 +271,74 @@ export const demoStore = {
 
   getEmployeeDashboard(employeeId, quarter) {
     return dashboardForEmployee(employeeId, quarter);
+  },
+
+  getGoalSheet(employeeId, quarter = "Q1") {
+    const sheet = goalSheets.find((item) => item.employeeId === employeeId && item.cycleYear === activeCycleYear);
+    return sheet ? sheetPayload(sheet, quarter) : null;
+  },
+
+  saveGoalSheet(employeeId, requestedGoals) {
+    const sheet = goalSheets.find((item) => item.employeeId === employeeId && item.cycleYear === activeCycleYear);
+    if (!sheet) return { status: 404, body: { message: "Goal sheet not found" } };
+    if (sheet.status === "Submitted" || sheet.status === "Approved") {
+      return { status: 409, body: { message: "Submitted or approved goal sheets are read-only." } };
+    }
+    if (requestedGoals.length > 8) return { status: 400, body: { message: "A goal sheet can include at most 8 goals." } };
+
+    const existingIds = goals.filter((goal) => goal.goalSheetId === sheet.id).map((goal) => goal.id);
+    existingIds.forEach((id) => {
+      const index = goals.findIndex((goal) => goal.id === id);
+      if (index >= 0) goals.splice(index, 1);
+    });
+
+    requestedGoals.forEach((goal, index) => {
+      goals.push({
+        id: goal.id || `${employeeId}-goal-${Date.now()}-${index}`,
+        goalSheetId: sheet.id,
+        thrustArea: goal.thrustArea || "General",
+        title: goal.title || `Goal ${index + 1}`,
+        description: goal.description || "",
+        uomType: goal.uomType || "Min",
+        target: String(goal.target ?? ""),
+        weightage: Number(goal.weightage || 0),
+        status: "Draft",
+        isShared: Boolean(goal.isShared),
+        isLocked: false
+      });
+    });
+    sheet.status = "Draft";
+    sheet.submittedAt = null;
+    sheet.approvedAt = null;
+    sheet.managerComment = "";
+    return { status: 200, body: this.getGoalSheet(employeeId) };
+  },
+
+  submitGoalSheet(employeeId) {
+    const sheet = goalSheets.find((item) => item.employeeId === employeeId && item.cycleYear === activeCycleYear);
+    if (!sheet) return { status: 404, body: { message: "Goal sheet not found" } };
+    const sheetGoals = goals.filter((goal) => goal.goalSheetId === sheet.id);
+    const validationError = validateGoalSheet(sheetGoals);
+    if (validationError) return { status: 400, body: { message: validationError } };
+    sheet.status = "Submitted";
+    sheet.submittedAt = new Date().toISOString();
+    sheet.approvedAt = null;
+    sheet.managerComment = "";
+    sheetGoals.forEach((goal) => {
+      goal.status = "Draft";
+      goal.isLocked = true;
+    });
+    const employee = users.find((user) => user.id === employeeId);
+    if (employee?.managerId) {
+      notifications.push({
+        id: `notif-submitted-${notifications.length + 1}`,
+        userId: employee.managerId,
+        message: `${employee.name} has submitted their goal sheet for your approval`,
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+    }
+    return { status: 200, body: this.getGoalSheet(employeeId) };
   },
 
   getTeamDashboard(managerId, quarter) {
@@ -488,7 +575,7 @@ export const demoStore = {
       }
     });
 
-    console.log("Ethereal preview URL: https://ethereal.email/message/demo-escalation-preview");
+    console.info("Ethereal preview URL: https://ethereal.email/message/demo-escalation-preview");
     return this.getEscalations();
   },
 
@@ -529,6 +616,11 @@ export const demoStore = {
     if (!sheet) return null;
     sheet.status = "Approved";
     sheet.approvedAt = new Date().toISOString();
+    sheet.managerComment = "";
+    goals.filter((goal) => goal.goalSheetId === sheet.id).forEach((goal) => {
+      goal.status = "Active";
+      goal.isLocked = true;
+    });
     const manager = users.find((item) => item.id === managerId);
     notifications.push({
       id: `notif-approved-${notifications.length + 1}`,
@@ -537,7 +629,28 @@ export const demoStore = {
       isRead: false,
       createdAt: new Date().toISOString()
     });
-    console.log("Ethereal preview URL: https://ethereal.email/message/demo-goal-approval-preview");
+    console.info("Ethereal preview URL: https://ethereal.email/message/demo-goal-approval-preview");
+    return sheet;
+  },
+
+  returnGoalSheet(goalSheetId, managerId, comment) {
+    const sheet = goalSheets.find((item) => item.id === goalSheetId);
+    if (!sheet) return null;
+    sheet.status = "Rejected";
+    sheet.managerComment = comment || "Please revise and resubmit.";
+    sheet.approvedAt = null;
+    goals.filter((goal) => goal.goalSheetId === sheet.id).forEach((goal) => {
+      goal.status = "Draft";
+      goal.isLocked = false;
+    });
+    const manager = users.find((item) => item.id === managerId);
+    notifications.push({
+      id: `notif-returned-${notifications.length + 1}`,
+      userId: sheet.employeeId,
+      message: `Your goal sheet was returned by ${manager?.name || "your manager"}: ${sheet.managerComment}`,
+      isRead: false,
+      createdAt: new Date().toISOString()
+    });
     return sheet;
   },
 

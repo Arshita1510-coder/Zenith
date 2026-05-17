@@ -41,5 +41,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`AtomQuest portal running at http://localhost:${port}`);
+  console.info(`AtomQuest portal running at http://localhost:${port}`);
 });

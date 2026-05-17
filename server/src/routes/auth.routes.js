@@ -5,6 +5,20 @@ import { requireAuth, signAuthToken } from "../auth.js";
 import { demoStore } from "../demoStore.js";
 
 export const authRouter = Router();
+const loginAttempts = new Map();
+
+function loginRateLimit(req, res, next) {
+  const key = req.ip || req.socket.remoteAddress || "local";
+  const now = Date.now();
+  const windowStart = now - 60_000;
+  const attempts = (loginAttempts.get(key) || []).filter((timestamp) => timestamp > windowStart);
+  if (attempts.length >= 10) {
+    return res.status(429).json({ message: "Too many login attempts. Please wait a minute and try again." });
+  }
+  attempts.push(now);
+  loginAttempts.set(key, attempts);
+  return next();
+}
 
 function publicUser(user) {
   return {
@@ -16,12 +30,19 @@ function publicUser(user) {
   };
 }
 
-authRouter.post("/login", async (req, res, next) => {
+authRouter.post("/login", loginRateLimit, async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const demoUser = await demoStore.findUserByEmail(email || "");
+    const isDemoValid = demoUser ? await demoStore.verifyPassword(demoUser, password || "") : false;
+    if (isDemoValid) {
+      const token = signAuthToken(demoUser);
+      return res.json({ token, user: demoStore.publicUser(demoUser), mode: "demo-memory" });
     }
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });

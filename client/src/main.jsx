@@ -444,11 +444,14 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
   const [quarter, setQuarter] = useState("Q1");
   const [dashboard, setDashboard] = useState(null);
   const [forms, setForms] = useState({});
+  const [draftGoals, setDraftGoals] = useState([]);
   const [message, setMessage] = useState("");
+  const [validation, setValidation] = useState("");
 
   async function loadDashboard(activeQuarter = quarter) {
-    const data = await api(`/api/achievements/dashboard/${user.id}/${activeQuarter}`);
+    const data = await api(`/api/goal-sheets/my/${activeQuarter}`);
     setDashboard(data);
+    setDraftGoals(data.goals.length ? data.goals.map(goalToDraft) : [newDraftGoal()]);
     setForms(
       Object.fromEntries(
         data.goals.map((goal) => [
@@ -487,6 +490,84 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
   }
 
   const isWindowOpen = dashboard?.window?.isOpen;
+  const isApproved = dashboard?.goalSheet?.status === "Approved";
+  const draftTotal = draftGoals.reduce((sum, goal) => sum + Number(goal.weightage || 0), 0);
+
+  function validateDraft() {
+    if (draftGoals.length > 8) return "A goal sheet can include at most 8 goals.";
+    if (draftGoals.some((goal) => Number(goal.weightage) < 10)) return "Each goal must have at least 10% weightage.";
+    if (draftTotal !== 100) return `Total weightage must equal 100%. Current total is ${draftTotal}%.`;
+    if (draftGoals.some((goal) => !goal.title || !goal.target)) return "Every goal needs a title and target.";
+    return "";
+  }
+
+  async function saveDraft() {
+    setValidation("");
+    try {
+      const data = await api("/api/goal-sheets/my", { method: "PUT", body: JSON.stringify({ goals: draftGoals }) });
+      setDashboard(data);
+      setMessage("Draft goal sheet saved.");
+    } catch (error) {
+      setValidation(error.message);
+    }
+  }
+
+  async function submitSheet() {
+    const error = validateDraft();
+    if (error) {
+      setValidation(error);
+      return;
+    }
+    await saveDraft();
+    try {
+      const data = await api("/api/goal-sheets/my/submit", { method: "POST", body: JSON.stringify({}) });
+      setDashboard(data);
+      setMessage("Goal sheet submitted for manager approval. It is read-only until returned.");
+    } catch (error) {
+      setValidation(error.message);
+    }
+  }
+
+  function updateDraft(index, field, value) {
+    setDraftGoals((current) => current.map((goal, goalIndex) => (goalIndex === index ? { ...goal, [field]: value } : goal)));
+  }
+
+  if (dashboard && !isApproved) {
+    const readOnly = dashboard.goalSheet.status === "Submitted";
+    return (
+      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goal Sheet" subtitle="Create annual goals and submit them for manager approval">
+        <PageHeader title="Goal Sheet Builder" subtitle={`Status: ${formatStatus(dashboard.goalSheet.status)} · Total weightage ${draftTotal}%`} />
+        {dashboard.goalSheet.managerComment ? <Notice>Manager comment: {dashboard.goalSheet.managerComment}</Notice> : null}
+        {message ? <Notice>{message}</Notice> : null}
+        {validation ? <p className="mb-5 rounded-md bg-[#fff1f0] px-4 py-3 text-sm font-semibold text-[#a13a31]">{validation}</p> : null}
+        <div className="mb-4 flex flex-wrap gap-3">
+          <button className="rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={readOnly || draftGoals.length >= 8} onClick={() => setDraftGoals((current) => [...current, newDraftGoal()])} type="button">Add Goal</button>
+          <button className="rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50" disabled={readOnly} onClick={saveDraft} type="button">Save Draft</button>
+          <button className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={readOnly} onClick={submitSheet} type="button">Submit for Approval</button>
+        </div>
+        <div className="grid gap-4">
+          {draftGoals.map((goal, index) => (
+            <article className="rounded-lg border border-[#dce4d8] bg-white p-4" key={goal.id || index}>
+              <div className="grid gap-3 md:grid-cols-6">
+                <Input label="Title" value={goal.title} onChange={(value) => updateDraft(index, "title", value)} />
+                <Input label="Thrust Area" value={goal.thrustArea} onChange={(value) => updateDraft(index, "thrustArea", value)} />
+                <Select label="UoM" value={goal.uomType} onChange={(value) => updateDraft(index, "uomType", value)} options={[["Min", "Min"], ["Max", "Max"], ["Timeline", "Timeline"], ["Zero", "Zero"]]} />
+                <Input label="Target" type={goal.uomType === "Timeline" ? "date" : "text"} value={goal.target} onChange={(value) => updateDraft(index, "target", value)} />
+                <Input label="Weightage" type="number" value={goal.weightage} onChange={(value) => updateDraft(index, "weightage", value)} />
+                <div className="flex items-end">
+                  <button className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={readOnly || draftGoals.length === 1} onClick={() => setDraftGoals((current) => current.filter((_, goalIndex) => goalIndex !== index))} type="button">Remove</button>
+                </div>
+              </div>
+              <label className="mt-3 block">
+                <span className="mb-2 block text-sm font-medium">Description</span>
+                <textarea className="min-h-20 w-full rounded-md border border-[#cfd9cf] px-3 py-2 outline-none" disabled={readOnly} value={goal.description} onChange={(event) => updateDraft(index, "description", event.target.value)} />
+              </label>
+            </article>
+          ))}
+        </div>
+      </Shell>
+    );
+  }
 
   return (
     <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goals" subtitle="Locked approved goals and quarterly achievement updates">
@@ -573,11 +654,30 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
   );
 }
 
+function newDraftGoal() {
+  return { id: "", title: "", thrustArea: "Growth", description: "", uomType: "Min", target: "", weightage: 20, isShared: false };
+}
+
+function goalToDraft(goal) {
+  return {
+    id: goal.id,
+    title: goal.title,
+    thrustArea: goal.thrustArea,
+    description: goal.description,
+    uomType: goal.uomType,
+    target: goal.target,
+    weightage: goal.weightage,
+    isShared: goal.isShared
+  };
+}
+
 function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
   const [view, setView] = useState("team");
   const [quarter, setQuarter] = useState("Q1");
   const [team, setTeam] = useState(null);
   const [comments, setComments] = useState({});
+  const [targetEdits, setTargetEdits] = useState({});
+  const [returnComments, setReturnComments] = useState({});
   const [message, setMessage] = useState("");
 
   async function loadTeam(activeQuarter = quarter) {
@@ -594,6 +694,7 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
         ])
       )
     );
+    setTargetEdits(Object.fromEntries(data.reportees.flatMap((report) => report.goals.map((goal) => [goal.id, goal.target]))));
   }
 
   useEffect(() => {
@@ -632,6 +733,26 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
     } catch (error) {
       setMessage(error.message);
     }
+  }
+
+  async function returnGoalSheet(report) {
+    setMessage("");
+    try {
+      await api("/api/checkins/return-goal-sheet", {
+        method: "POST",
+        body: JSON.stringify({ goalSheetId: report.goalSheet.id, comment: returnComments[report.goalSheet.id] || "Please revise and resubmit." })
+      });
+      await loadTeam();
+      setMessage(`Goal sheet returned to ${report.employee.name}.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
+  async function saveTarget(goal) {
+    await api(`/api/admin/goal/${goal.id}`, { method: "PUT", body: JSON.stringify({ target: targetEdits[goal.id] }) });
+    await loadTeam();
+    setMessage(`${goal.title} target updated for approval review.`);
   }
 
   const total = team?.reportees.reduce((count, report) => count + report.summary.totalGoals, 0) || 0;
@@ -704,7 +825,12 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
                         <span className="block font-semibold">{goal.title}</span>
                         <span className="text-xs text-[#697789]">{goal.uomType} UoM</span>
                       </td>
-                      <td className="px-4 py-3">{goal.target}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex min-w-44 gap-2">
+                          <input className="w-24 rounded-md border border-[#cfd9cf] px-2 py-1" value={targetEdits[goal.id] ?? goal.target} onChange={(event) => setTargetEdits((current) => ({ ...current, [goal.id]: event.target.value }))} />
+                          <button className="rounded-md border border-[#cfd9cf] px-2 py-1 text-xs font-semibold" onClick={() => saveTarget(goal)} type="button">Save</button>
+                        </div>
+                      </td>
                       <td className="px-4 py-3">{goal.achievement?.actual || "Pending"}</td>
                       <td className="px-4 py-3">
                         <ScoreBadge
@@ -728,10 +854,14 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
                   <ClipboardCheck size={18} />
                   <h4 className="font-semibold">Structured check-in record</h4>
                 </div>
-                <button className="mb-4 inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold" onClick={() => approveGoalSheet(report)} type="button">
+                <div className="mb-4 flex flex-wrap gap-2">
+                <button className="inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold" onClick={() => approveGoalSheet(report)} type="button">
                   <CheckCircle2 size={16} />
                   Approve goal sheet
                 </button>
+                <input className="min-w-64 rounded-md border border-[#cfd9cf] px-3 py-2 text-sm" placeholder="Return comment" value={returnComments[report.goalSheet.id] || ""} onChange={(event) => setReturnComments((current) => ({ ...current, [report.goalSheet.id]: event.target.value }))} />
+                <button className="rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold" onClick={() => returnGoalSheet(report)} type="button">Return with Comment</button>
+                </div>
                 <label className="mb-3 block">
                   <span className="mb-2 block text-sm font-medium">Discussion notes</span>
                   <textarea

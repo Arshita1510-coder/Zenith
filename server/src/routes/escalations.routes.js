@@ -33,6 +33,7 @@ async function fetchEscalations() {
 
 escalationsRouter.get("/", requireAuth, requireRole("Admin"), async (_req, res) => {
   try {
+    if (_req.user.sub?.startsWith("demo-")) return res.json(demoStore.getEscalations());
     return res.json(await fetchEscalations());
   } catch {
     return res.json(demoStore.getEscalations());
@@ -41,6 +42,7 @@ escalationsRouter.get("/", requireAuth, requireRole("Admin"), async (_req, res) 
 
 escalationsRouter.post("/run", requireAuth, requireRole("Admin"), async (_req, res) => {
   try {
+    if (_req.user.sub?.startsWith("demo-")) return res.json(demoStore.runEscalationCheck());
     const now = new Date();
     const cycleYear = now.getFullYear();
     const cycleOpen = new Date(`${cycleYear}-04-01T00:00:00.000Z`);
@@ -110,7 +112,7 @@ escalationsRouter.post("/run", requireAuth, requireRole("Admin"), async (_req, r
       }
     }
 
-    console.log("Ethereal preview URL: https://ethereal.email/message/demo-escalation-preview");
+    console.info("Ethereal preview URL: https://ethereal.email/message/demo-escalation-preview");
     return res.json(await fetchEscalations());
   } catch {
     return res.json(demoStore.runEscalationCheck());

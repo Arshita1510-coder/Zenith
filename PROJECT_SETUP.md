@@ -23,8 +23,8 @@ The employee is assigned to the manager through `User.managerId`.
 2. Confirm `server/.env` points at the database:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/goal_tracking_portal?schema=public"
-JWT_SECRET="dev-demo-secret-change-me"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/goal_tracking_portal?schema=public"
+JWT_SECRET="use-a-long-random-secret"
 PORT=3001
 CLIENT_ORIGIN="http://localhost:5173"
 ```

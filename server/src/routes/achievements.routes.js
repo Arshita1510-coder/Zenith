@@ -62,6 +62,11 @@ async function getEmployeeGoals(employeeId, quarter) {
 achievementsRouter.get("/dashboard/:employeeId/:quarter", requireAuth, async (req, res, next) => {
   try {
     const { employeeId, quarter } = req.params;
+    if (req.user.sub?.startsWith("demo-")) {
+      const canView = req.user.role === "Admin" || req.user.sub === employeeId || (req.user.role === "Manager" && demoStore.canManagerView(req.user.sub, employeeId));
+      if (!canView) return res.status(403).json({ message: "You cannot view this employee's goals" });
+      return res.json(demoStore.getEmployeeDashboard(employeeId, quarter));
+    }
     const canView =
       req.user.role === "Admin" ||
       req.user.sub === employeeId ||

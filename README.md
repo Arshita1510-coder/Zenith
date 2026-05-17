@@ -1,86 +1,118 @@
-# AtomQuest Goal Setting & Tracking Portal
+# Zenith
 
-This is a browser-based enterprise demo implementation of the AtomQuest Hackathon 1.0 BRD for an **In-House Goal Setting & Tracking Portal**.
+Goal achievement tracking for employees, managers, and admins.
 
-## How to Run
+## Problem Statement
 
-Run the local frontend server and open the site:
+Zenith solves the messy handoff between annual goal setting, quarterly achievement tracking, and manager check-ins. Employees can submit structured goal sheets with measurable targets, managers can approve and review progress, and admins can govern the full cycle. The portal also gives leadership visibility into completion, overdue actions, audit logs, and analytics.
 
-```powershell
-node dev-server.js
-```
+## Tech Stack
 
-Then open `http://localhost:5173`.
+- Frontend: React 19, Vite, Tailwind CSS, Lucide icons, Recharts, XLSX
+- Backend: Node.js, Express, JWT auth, bcrypt password hashing
+- Database: PostgreSQL with Prisma ORM
+- Auth: Email/password login with role-based JWT middleware
+- Reporting: CSV/XLSX exports, Recharts visual analytics
 
-The app is integrated with Supabase Auth/profiles and also includes a local demo-session fallback for hackathon judging. Use **Reset demo data** to restore the seeded state.
-
-## Supabase Setup
-
-Backend project:
-
-`https://hfngakvgrdgvrjobjkqq.supabase.co`
-
-Run `supabase-schema.sql` in the Supabase SQL Editor before using the app. It creates the `app_state` and `profiles` tables, enables Row Level Security, and blocks client-side profile creation/role mutation. Public signup should stay disabled in Supabase; Admin-created users must have rows in `profiles`.
-
-## Demo Users
-
-All demo users use password `AtomQuest@123` in local demo mode:
-
-- Employee: `ananya@atomquest.com`
-- Employee: `rohan@atomquest.com`
-- Manager (L1): `meera@atomquest.com`
-- Admin/HR: `admin@atomquest.com`
-
-The login screen shows Employee, Manager, and Admin access lanes. A user can enter only through the role assigned in the database/profile.
-
-## Implemented Scope
-
-- Employee goal creation and submission
-- Role-based authentication lanes with protected dashboard routing
-- Admin-created user model with no public signup UI
-- Validation for total weightage, minimum weightage, and max goal count
-- Manager approval, return for rework, inline target and weightage edits
-- Goal lock after approval
-- Shared departmental KPI push
-- Quarterly achievement capture
-- Manager check-in comments
-- Progress score calculation by UoM type
-- Admin cycle status, completion dashboard, and unlock workflow
-- Admin user management, role assignment, hierarchy table, escalation workflow, and integration readiness panels
-- Audit trail
-- Achievement reports, completion dashboard, activity tracking, team performance analytics, goal distribution analysis, heatmaps, manager effectiveness reporting
-- CSV achievement report export
-
-## Architecture
+## Architecture Diagram
 
 ```mermaid
 flowchart LR
-  Browser["Responsive Browser UI"] --> Auth["Supabase Auth / JWT Session"]
-  Auth --> RBAC["Role-Based Access Guard"]
-  RBAC --> Employee["Employee Dashboard"]
-  RBAC --> Manager["Manager Dashboard"]
-  RBAC --> Admin["Admin / HR Dashboard"]
-  Employee --> Goals["Goal Sheets"]
-  Manager --> Approvals["Approvals and Check-ins"]
-  Admin --> Governance["Users, Hierarchy, Cycles, Audit"]
-  Goals --> Rules["Weightage and Locking Rules"]
-  Approvals --> Scores["Progress Score Engine"]
-  Governance --> Reports["Reports, Heatmaps, CSV Export"]
-  Reports --> Supabase["Supabase PostgreSQL Tables"]
-  Browser --> Storage["localStorage demo cache"]
+  Browser["Browser"] --> React["React Frontend"]
+  React --> API["Express API"]
+  API --> Auth["JWT Auth + Role Middleware"]
+  Auth --> DB["PostgreSQL DB via Prisma"]
 ```
 
-## Live Demo / Repository
+## Features List
 
-This workspace contains the runnable repository contents. For live hosting, deploy these static files to Vercel/Netlify and configure the Supabase URL/key in `app.js`, or move the same workflow into a Next.js + Node.js API deployment on Vercel and Render/Railway/AWS.
+- Employee goal sheet creation, draft saving, validation, and submission
+- Manager review workflow with target edits, approval, and return comments
+- Quarterly achievement updates for Min, Max, Timeline, and Zero UoM goals
+- Automatic progress scoring with green, amber, red, and neutral bands
+- Admin-controlled quarterly check-in windows
+- Structured manager check-ins with completion tracking
+- Achievement report with filters, pagination, CSV export, and Excel export
+- Completion dashboard by employee, manager, and quarter
+- Audit log for admin unlocks and manager target edits
+- User hierarchy management and manager reassignment
+- JWT-protected role access for Employee, Manager, and Admin
 
-## Production Upgrade Path
+## Bonus Features
 
-For a hosted production version, split the JSON state into normalized database tables:
+- Escalation engine with manual demo trigger and daily-overdue rules
+- Admin escalation dashboard with resolution notes
+- Analytics module with goal distribution, weightage, QoQ trend, progress heatmap, and completion gauge
+- In-app notification bell with unread count and read state
+- Demo Ethereal preview URL logging for approval/escalation emails
+- Dark mode toggle persisted in localStorage
+- Responsive layouts for desktop, tablet, and mobile
+- Skeleton loading states and empty states
+- Login rate limiting at 10 attempts per minute per IP
 
-- Frontend: React or Next.js
-- Backend: Node.js API or Next.js server actions
-- Database: PostgreSQL
-- Auth: Microsoft Entra ID
-- Notifications: Email and Microsoft Teams
-- Exports: Server-generated CSV/XLSX
+## Setup Instructions
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/Arshita1510-coder/Zenith.git
+   cd Zenith
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm run install:all
+   ```
+
+3. Create environment files:
+
+   ```bash
+   cp .env.example .env
+   cp server/.env.example server/.env
+   ```
+
+4. Fill in `server/.env`:
+
+   ```env
+   DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public"
+   JWT_SECRET="use-a-long-random-secret"
+   PORT=3001
+   CLIENT_ORIGIN="http://localhost:5173"
+   ```
+
+5. Run Prisma migrations and seed data:
+
+   ```bash
+   npm run prisma:migrate
+   npm run seed
+   ```
+
+6. Start the dev servers:
+
+   ```bash
+   npm run dev
+   ```
+
+7. Open the frontend:
+
+   ```text
+   http://localhost:5173
+   ```
+
+If PostgreSQL is not configured, the API falls back to the seeded in-memory demo store so judges can still test the main flows.
+
+## Demo Credentials
+
+| Email | Password | Role |
+| --- | --- | --- |
+| employee@atomquest.test | Password123! | Employee |
+| manager@atomquest.test | Password123! | Manager |
+| admin@atomquest.test | Password123! | Admin |
+
+## Known Limitations
+
+- Google SSO is not implemented; email/password login remains the supported flow.
+- Email sending is demo-mode only: the app logs Ethereal-style preview URLs rather than sending real SMTP mail.
+- The in-memory demo store resets when the server restarts.
+- Shared goal propagation is represented through shared goal flags and common reporting, not a full many-employee shared-goal table.

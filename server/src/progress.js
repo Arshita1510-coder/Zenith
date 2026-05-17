@@ -36,7 +36,11 @@ export function computeProgress(uomType, target, actual) {
     return { scorePercent, scoreLabel: `${scorePercent}%` };
   }
 
-  if (numericTarget <= 0 || numericActual < 0) {
+  if (numericTarget === 0 && uomType !== "Zero") {
+    return { scorePercent: null, scoreLabel: "N/A" };
+  }
+
+  if (numericTarget < 0 || numericActual < 0) {
     return { scorePercent: null, scoreLabel: "Invalid value" };
   }
 

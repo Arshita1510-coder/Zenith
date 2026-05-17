@@ -10,6 +10,7 @@ import { analyticsRouter } from "./routes/analytics.routes.js";
 import { auditRouter } from "./routes/audit.routes.js";
 import { checkInsRouter } from "./routes/checkins.routes.js";
 import { escalationsRouter } from "./routes/escalations.routes.js";
+import { goalSheetsRouter } from "./routes/goalSheets.routes.js";
 import { notificationsRouter } from "./routes/notifications.routes.js";
 import { reportsRouter } from "./routes/reports.routes.js";
 
@@ -46,6 +47,7 @@ app.use("/api/analytics", analyticsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/audit-logs", auditRouter);
 app.use("/api/escalations", escalationsRouter);
+app.use("/api/goal-sheets", goalSheetsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/protected", protectedRouter);
 app.use("/achievements", achievementsRouter);
@@ -55,6 +57,7 @@ app.use("/analytics", analyticsRouter);
 app.use("/reports", reportsRouter);
 app.use("/audit-logs", auditRouter);
 app.use("/escalations", escalationsRouter);
+app.use("/goal-sheets", goalSheetsRouter);
 app.use("/notifications", notificationsRouter);
 
 app.use((err, _req, res, _next) => {
@@ -63,5 +66,5 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(port, () => {
-  console.log(`Goal tracking API listening on http://localhost:${port}`);
+  console.info(`Goal tracking API listening on http://localhost:${port}`);
 });
