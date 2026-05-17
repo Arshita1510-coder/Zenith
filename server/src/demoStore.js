@@ -25,16 +25,14 @@ const goalSheets = employeeUsers.map((employee) => ({
   id: `goalsheet-${employee.id}-2026`,
   employeeId: employee.id,
   cycleYear: 2026,
-  status: employee.id === "demo-employee" ? "Draft" : employee.id === "demo-employee-3" ? "Submitted" : "Approved",
-  submittedAt: employee.id === "demo-employee" ? null : "2026-04-20T10:00:00.000Z",
-  approvedAt: employee.id === "demo-employee-2" ? "2026-04-25T10:00:00.000Z" : null,
+  status: employee.id === "demo-employee-3" ? "Submitted" : "Approved",
+  submittedAt: "2026-04-20T10:00:00.000Z",
+  approvedAt: employee.id === "demo-employee-3" ? null : "2026-04-25T10:00:00.000Z",
   managerComment: ""
 }));
 
 const goals = goalSheets.flatMap((sheet) =>
-  sheet.employeeId === "demo-employee"
-    ? []
-    : goalTemplates.map(([thrustArea, title, description, uomType, target, weightage], index) => ({
+  goalTemplates.map(([thrustArea, title, description, uomType, target, weightage], index) => ({
     id: `${sheet.employeeId}-goal-${index + 1}`,
     goalSheetId: sheet.id,
     thrustArea,
@@ -72,10 +70,23 @@ const windows = quarters.map((quarter) => ({
 seedDemoProgress();
 
 function seedDemoProgress() {
+  addAchievement("demo-employee-goal-1", "Q1", "98000", "OnTrack");
+  addAchievement("demo-employee-goal-2", "Q1", "46", "Completed");
+  addAchievement("demo-employee-goal-4", "Q1", "0", "Completed");
   addAchievement("demo-employee-2-goal-1", "Q1", "103000", "Completed");
   addAchievement("demo-employee-2-goal-2", "Q1", "44", "Completed");
   addAchievement("demo-employee-2-goal-4", "Q1", "0", "Completed");
   addAchievement("demo-employee-3-goal-1", "Q1", "42000", "OnTrack");
+
+  checkIns.push({
+    id: "checkin-emery-q1",
+    goalSheetId: "goalsheet-demo-employee-2026",
+    managerId: "demo-manager",
+    quarter: "Q1",
+    comment: "Excellent Q1 momentum. Keep it up!",
+    isCompleted: true,
+    createdAt: new Date().toISOString()
+  });
 
   checkIns.push({
     id: "checkin-rowan-q1",
