@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import {
   ArrowRight,
   BarChart3,
+  Bell,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
@@ -10,14 +11,35 @@ import {
   FileSpreadsheet,
   LockKeyhole,
   LogOut,
+  Moon,
+  PlayCircle,
   Search,
   ShieldCheck,
   SlidersHorizontal,
+  Sun,
   Unlock,
   UserCog,
   UsersRound
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  PolarAngleAxis,
+  RadialBar,
+  RadialBarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 import "./styles.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -101,6 +123,33 @@ function formatStatus(status) {
   return status?.replace(/([A-Z])/g, " $1").trim() || "Pending";
 }
 
+function chartToPng(containerId, filename) {
+  const svg = document.querySelector(`#${containerId} svg`);
+  if (!svg) return;
+  const xml = new XMLSerializer().serializeToString(svg);
+  const image = new Image();
+  const url = URL.createObjectURL(new Blob([xml], { type: "image/svg+xml;charset=utf-8" }));
+  image.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = svg.clientWidth || 720;
+    canvas.height = svg.clientHeight || 320;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      const pngUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = pngUrl;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(pngUrl);
+    });
+    URL.revokeObjectURL(url);
+  };
+  image.src = url;
+}
+
 function App() {
   const storedUser = useMemo(() => {
     const raw = localStorage.getItem("aq_user");
@@ -111,6 +160,12 @@ function App() {
   const [user, setUser] = useState(storedUser);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("zenith_dark") === "true");
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("zenith_dark", String(darkMode));
+  }, [darkMode]);
 
   async function login(event) {
     event.preventDefault();
@@ -147,15 +202,15 @@ function App() {
   }
 
   if (user?.role === "Employee") {
-    return <EmployeeDashboard user={user} onLogout={logout} />;
+    return <EmployeeDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} />;
   }
 
   if (user?.role === "Manager") {
-    return <ManagerDashboard user={user} onLogout={logout} />;
+    return <ManagerDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} />;
   }
 
   if (user?.role === "Admin") {
-    return <AdminDashboard user={user} onLogout={logout} />;
+    return <AdminDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} />;
   }
 
   return (
@@ -234,12 +289,72 @@ function App() {
   );
 }
 
-function Shell({ user, onLogout, children, icon, title, subtitle }) {
+function NotificationBell({ user }) {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  async function load() {
+    if (!user?.id) return;
+    const data = await api(`/api/notifications/${user.id}`);
+    setNotifications(data.notifications);
+  }
+
+  useEffect(() => {
+    load().catch(() => {});
+    const interval = window.setInterval(() => load().catch(() => {}), 10000);
+    return () => window.clearInterval(interval);
+  }, [user?.id]);
+
+  async function markRead(notification) {
+    await api(`/api/notifications/${notification.id}/read`, { method: "PUT", body: JSON.stringify({}) });
+    await load();
+  }
+
+  const unread = notifications.filter((item) => !item.isRead).length;
+
+  return (
+    <div className="relative">
+      <button className="relative rounded-md border border-[#cfd9cf] bg-white p-2" onClick={() => setOpen((current) => !current)} type="button" aria-label="Notifications">
+        <Bell size={18} />
+        {unread ? <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#ec6b5f] text-xs font-bold text-white">{unread}</span> : null}
+      </button>
+      {open ? (
+        <div className="absolute right-0 z-40 mt-2 w-80 rounded-lg border border-[#dce4d8] bg-white p-3 shadow-xl">
+          <p className="mb-2 text-sm font-semibold">Notifications</p>
+          <div className="grid max-h-80 gap-2 overflow-y-auto">
+            {notifications.length ? (
+              notifications.slice(0, 6).map((notification) => (
+                <button className={`rounded-md p-3 text-left text-sm ${notification.isRead ? "bg-[#f7f8f4] text-[#697789]" : "bg-[#e6f4ed] text-ink"}`} key={notification.id} onClick={() => markRead(notification)} type="button">
+                  {notification.message}
+                  <span className="mt-1 block text-xs text-[#697789]">{new Date(notification.createdAt).toLocaleString()}</span>
+                </button>
+              ))
+            ) : (
+              <p className="rounded-md bg-[#f7f8f4] p-3 text-sm text-[#697789]">No notifications.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Shell({ user, onLogout, children, icon, title, subtitle, darkMode, setDarkMode }) {
   return (
     <main className="min-h-screen bg-[#f7f8f4] px-5 py-8 text-ink">
       <section className="mx-auto max-w-7xl">
         <nav className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[#dce4d8] pb-5">
           <div className="flex items-center gap-3">
+            <NotificationBell user={user} />
+            <button
+              aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              className="inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-3 py-2 text-sm font-medium"
+              onClick={() => setDarkMode?.(!darkMode)}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              type="button"
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             <div className="grid size-11 place-items-center rounded-lg bg-[#e6f4ed] text-[#247e57]">{icon}</div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">Zenith</p>
@@ -325,7 +440,7 @@ function bandForScore(score) {
   return "red";
 }
 
-function EmployeeDashboard({ user, onLogout }) {
+function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode }) {
   const [quarter, setQuarter] = useState("Q1");
   const [dashboard, setDashboard] = useState(null);
   const [forms, setForms] = useState({});
@@ -374,7 +489,7 @@ function EmployeeDashboard({ user, onLogout }) {
   const isWindowOpen = dashboard?.window?.isOpen;
 
   return (
-    <Shell user={user} onLogout={onLogout} icon={<BarChart3 size={22} />} title="My Goals" subtitle="Locked approved goals and quarterly achievement updates">
+    <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goals" subtitle="Locked approved goals and quarterly achievement updates">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
       </div>
@@ -458,7 +573,7 @@ function EmployeeDashboard({ user, onLogout }) {
   );
 }
 
-function ManagerDashboard({ user, onLogout }) {
+function ManagerDashboard({ user, onLogout, darkMode, setDarkMode }) {
   const [view, setView] = useState("team");
   const [quarter, setQuarter] = useState("Q1");
   const [team, setTeam] = useState(null);
@@ -505,12 +620,26 @@ function ManagerDashboard({ user, onLogout }) {
     }
   }
 
+  async function approveGoalSheet(report) {
+    setMessage("");
+    try {
+      await api("/api/checkins/approve-goal-sheet", {
+        method: "POST",
+        body: JSON.stringify({ goalSheetId: report.goalSheet.id })
+      });
+      await loadTeam();
+      setMessage(`Goal sheet approved for ${report.employee.name}.`);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
   const total = team?.reportees.reduce((count, report) => count + report.summary.totalGoals, 0) || 0;
   const updated = team?.reportees.reduce((count, report) => count + report.summary.updatedGoals, 0) || 0;
 
   if (view === "reports") {
     return (
-      <Shell user={user} onLogout={onLogout} icon={<FileSpreadsheet size={22} />} title="Reports" subtitle="Achievement reporting for your direct team">
+      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<FileSpreadsheet size={22} />} title="Reports" subtitle="Achievement reporting for your direct team">
         <ManagerNav view={view} setView={setView} />
         <AchievementReport currentUser={user} managerOnly />
       </Shell>
@@ -519,15 +648,24 @@ function ManagerDashboard({ user, onLogout }) {
 
   if (view === "completion") {
     return (
-      <Shell user={user} onLogout={onLogout} icon={<ClipboardCheck size={22} />} title="Completion Dashboard" subtitle="Team check-in completion status">
+      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<ClipboardCheck size={22} />} title="Completion Dashboard" subtitle="Team check-in completion status">
         <ManagerNav view={view} setView={setView} />
         <CompletionDashboard currentUser={user} managerOnly />
       </Shell>
     );
   }
 
+  if (view === "analytics") {
+    return (
+      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="Analytics" subtitle="Team goal analytics and progress trends">
+        <ManagerNav view={view} setView={setView} />
+        <AnalyticsPage currentUser={user} managerOnly />
+      </Shell>
+    );
+  }
+
   return (
-    <Shell user={user} onLogout={onLogout} icon={<UsersRound size={22} />} title="My Team" subtitle="Direct reportee progress and structured quarterly check-ins">
+    <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<UsersRound size={22} />} title="My Team" subtitle="Direct reportee progress and structured quarterly check-ins">
       <ManagerNav view={view} setView={setView} />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
@@ -590,6 +728,10 @@ function ManagerDashboard({ user, onLogout }) {
                   <ClipboardCheck size={18} />
                   <h4 className="font-semibold">Structured check-in record</h4>
                 </div>
+                <button className="mb-4 inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-semibold" onClick={() => approveGoalSheet(report)} type="button">
+                  <CheckCircle2 size={16} />
+                  Approve goal sheet
+                </button>
                 <label className="mb-3 block">
                   <span className="mb-2 block text-sm font-medium">Discussion notes</span>
                   <textarea
@@ -639,7 +781,8 @@ function ManagerNav({ view, setView }) {
   const items = [
     ["team", "My Team"],
     ["reports", "Reports"],
-    ["completion", "Completion"]
+    ["completion", "Completion"],
+    ["analytics", "Analytics"]
   ];
   return (
     <div className="mb-5 flex flex-wrap gap-2">
@@ -652,11 +795,13 @@ function ManagerNav({ view, setView }) {
   );
 }
 
-function AdminDashboard({ user, onLogout }) {
+function AdminDashboard({ user, onLogout, darkMode, setDarkMode }) {
   const [view, setView] = useState("overview");
   const nav = [
     ["overview", "Overview", ClipboardCheck],
     ["reports", "Reports", FileSpreadsheet],
+    ["escalations", "Escalations", PlayCircle],
+    ["analytics", "Analytics", BarChart3],
     ["audit", "Audit Log", ShieldCheck],
     ["cycle", "Cycle Management", SlidersHorizontal],
     ["users", "User Management", UserCog]
@@ -670,6 +815,13 @@ function AdminDashboard({ user, onLogout }) {
             <p className="text-sm font-semibold uppercase tracking-wide text-[#247e57]">Zenith</p>
             <h1 className="text-2xl font-semibold">Admin</h1>
             <p className="text-sm text-[#697789]">{user.name}</p>
+          </div>
+          <div className="mb-4 flex items-center gap-2">
+            <NotificationBell user={user} />
+            <button className="inline-flex flex-1 items-center justify-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-3 py-2 text-sm font-medium" onClick={() => setDarkMode(!darkMode)} type="button">
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+              {darkMode ? "Light" : "Dark"}
+            </button>
           </div>
           <div className="grid gap-2">
             {nav.map(([id, label, Icon]) => (
@@ -687,12 +839,248 @@ function AdminDashboard({ user, onLogout }) {
         <section className="p-6 lg:p-8">
           {view === "overview" ? <CompletionDashboard currentUser={user} /> : null}
           {view === "reports" ? <AchievementReport currentUser={user} /> : null}
+          {view === "escalations" ? <EscalationDashboard /> : null}
+          {view === "analytics" ? <AnalyticsPage currentUser={user} /> : null}
           {view === "audit" ? <AuditLogPage /> : null}
           {view === "cycle" ? <CycleManagement /> : null}
           {view === "users" ? <UserManagement /> : null}
         </section>
       </div>
     </main>
+  );
+}
+
+function EscalationDashboard() {
+  const [data, setData] = useState({ escalations: [], summary: {} });
+  const [notes, setNotes] = useState({});
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    setData(await api("/api/escalations"));
+  }
+
+  useEffect(() => {
+    load().catch((error) => setMessage(error.message));
+  }, []);
+
+  async function runCheck() {
+    setMessage("Running escalation check...");
+    setData(await api("/api/escalations/run", { method: "POST", body: JSON.stringify({}) }));
+    setMessage("Escalation check completed.");
+  }
+
+  async function resolve(id) {
+    await api(`/api/escalations/${id}/resolve`, { method: "PUT", body: JSON.stringify({ note: notes[id] || "Resolved by Admin" }) });
+    await load();
+    setMessage("Escalation resolved.");
+  }
+
+  const cards = ["Goal Sheets Overdue", "Manager Approvals Pending", "Quarterly Achievements Pending", "Manager Check-ins Pending"];
+
+  return (
+    <div>
+      <PageHeader title="Escalation Dashboard" subtitle="Daily overdue detection and admin resolution workflow" />
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <button className="inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={runCheck} type="button">
+          <PlayCircle size={17} />
+          Run Escalation Check Now
+        </button>
+        {message ? <span className="text-sm font-medium text-[#536272]">{message}</span> : null}
+      </div>
+      <div className="mb-5 grid gap-4 md:grid-cols-4">
+        {cards.map((card) => (
+          <article className="rounded-lg border border-[#dce4d8] bg-white p-4" key={card}>
+            <p className="text-sm font-semibold text-[#247e57]">{card}</p>
+            <h3 className="mt-2 text-3xl font-semibold">{data.summary?.[card] || 0}</h3>
+          </article>
+        ))}
+      </div>
+      <div className="grid gap-3">
+        {data.escalations.length ? (
+          data.escalations.map((item) => (
+            <article className="grid gap-3 rounded-lg border border-[#dce4d8] bg-white p-4 md:grid-cols-[1fr_auto]" key={item.id}>
+              <div>
+                <p className="font-semibold">{item.userName} - {item.userRole}</p>
+                <p className="text-sm text-[#697789]">{item.type} - {item.daysOverdue} days overdue</p>
+                <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${item.status === "Resolved" ? "bg-[#e6f4ed] text-[#17633f]" : "bg-[#fff5df] text-[#8a5a00]"}`}>{item.status}</span>
+              </div>
+              {item.status === "Pending" ? (
+                <div className="flex flex-col gap-2 md:w-80">
+                  <input className="rounded-md border border-[#cfd9cf] px-3 py-2 text-sm" placeholder="Resolution note" value={notes[item.id] || ""} onChange={(event) => setNotes((current) => ({ ...current, [item.id]: event.target.value }))} />
+                  <button className="rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={() => resolve(item.id)} type="button">Mark Resolved</button>
+                </div>
+              ) : (
+                <p className="text-sm text-[#697789]">{item.note}</p>
+              )}
+            </article>
+          ))
+        ) : (
+          <div className="rounded-lg border border-[#dce4d8] bg-white p-8 text-center">
+            <p className="text-lg font-semibold">No escalations - you are all caught up.</p>
+            <p className="mt-2 text-sm text-[#697789]">Run the check any time to refresh overdue status.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsPage({ currentUser, managerOnly = false }) {
+  const [quarter, setQuarter] = useState("Q1");
+  const [data, setData] = useState(null);
+  const [message, setMessage] = useState("");
+  const colors = ["#247e57", "#ec6b5f", "#e3a72f", "#5470c6", "#8a63d2"];
+
+  async function load() {
+    const params = new URLSearchParams({ quarter, ...(managerOnly ? { managerId: currentUser.id } : {}) });
+    setData(await api(`/api/analytics?${params.toString()}`));
+  }
+
+  useEffect(() => {
+    load().catch((error) => setMessage(error.message));
+  }, [quarter]);
+
+  return (
+    <div>
+      <PageHeader title="Analytics" subtitle="Goal distribution, progress heatmap, QoQ trend, and completion rate" />
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
+      </div>
+      {message ? <Notice>{message}</Notice> : null}
+      {!data ? <SkeletonGrid /> : (
+        <div className="grid gap-5">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <ChartCard id="goal-distribution" title="Goal Distribution" onDownload={() => chartToPng("goal-distribution", "goal-distribution.png")}>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={data.distribution} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} label>
+                    {data.distribution.map((entry, index) => <Cell key={entry.name} fill={colors[index % colors.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            <ChartCard id="weightage-chart" title="Average Weightage by Thrust Area" onDownload={() => chartToPng("weightage-chart", "weightage-chart.png")}>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={data.distribution}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="averageWeightage" fill="#247e57" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </div>
+          <ChartCard id="trend-chart" title="Quarter-on-Quarter Progress Trend" onDownload={() => chartToPng("trend-chart", "qoq-trend.png")}>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={data.trend}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="quarter" />
+                <YAxis domain={[0, 120]} />
+                <Tooltip />
+                <Line type="monotone" dataKey="average" stroke="#ec6b5f" strokeWidth={3} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+          <div className="grid gap-5 lg:grid-cols-[1.4fr_0.6fr]">
+            <div className="rounded-lg border border-[#dce4d8] bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Progress Heatmap</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr>
+                      <th className="px-3 py-2">Employee</th>
+                      {data.heatmap[0]?.goals.map((goal) => <th className="px-3 py-2" key={goal.goalId}>{goal.goalTitle}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.heatmap.map((row) => (
+                      <tr key={row.employeeId}>
+                        <td className="px-3 py-2 font-semibold">{row.employeeName}</td>
+                        {row.goals.map((goal) => <td className="px-3 py-2" key={goal.goalId}><HeatCell employee={row.employeeName} goal={goal} /></td>)}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <ChartCard id="completion-gauge" title={`${data.activeQuarter} Completion Rate`} onDownload={() => chartToPng("completion-gauge", "completion-rate.png")}>
+              <ResponsiveContainer width="100%" height={260}>
+                <RadialBarChart innerRadius="60%" outerRadius="100%" data={[{ name: "Completion", value: data.completionRate, fill: "#247e57" }]} startAngle={180} endAngle={0}>
+                  <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                  <RadialBar dataKey="value" cornerRadius={8} />
+                  <Tooltip />
+                  <text x="50%" y="58%" textAnchor="middle" className="fill-[#18212f] text-3xl font-bold">{data.completionRate}%</text>
+                </RadialBarChart>
+              </ResponsiveContainer>
+              <p className="text-center text-sm text-[#697789]">Target line: 100%</p>
+            </ChartCard>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChartCard({ id, title, onDownload, children }) {
+  return (
+    <section className="rounded-lg border border-[#dce4d8] bg-white p-5 shadow-sm" id={id}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <button className="inline-flex items-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-3 py-2 text-sm font-semibold" onClick={onDownload} type="button">
+          <Download size={16} />
+          PNG
+        </button>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function HeatCell({ employee, goal }) {
+  const band = bandForScore(goal.score);
+  const colors = {
+    green: "bg-[#2f9e69] text-white",
+    amber: "bg-[#e3a72f] text-[#2f2612]",
+    red: "bg-[#ec6b5f] text-white",
+    neutral: "bg-[#d9e0e8] text-[#536272]"
+  };
+
+  return (
+    <div
+      className={`grid min-h-12 min-w-24 place-items-center rounded-md px-3 py-2 text-xs font-bold ${colors[band]}`}
+      title={`${employee} | ${goal.goalTitle} | ${goal.label} | ${goal.quarter}`}
+    >
+      {goal.score === null || goal.score === undefined ? "NS" : `${Math.round(goal.score)}%`}
+    </div>
+  );
+}
+
+function SkeletonGrid() {
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-5 lg:grid-cols-2">
+        {[0, 1].map((item) => <SkeletonCard key={item} />)}
+      </div>
+      <SkeletonCard wide />
+      <div className="grid gap-5 lg:grid-cols-[1.4fr_0.6fr]">
+        <SkeletonCard wide />
+        <SkeletonCard />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonCard({ wide = false }) {
+  return (
+    <div className={`rounded-lg border border-[#dce4d8] bg-white p-5 ${wide ? "min-h-72" : "min-h-80"}`}>
+      <div className="mb-5 h-5 w-48 animate-pulse rounded bg-[#edf1eb]" />
+      <div className="h-56 animate-pulse rounded-md bg-[#f1f4ef]" />
+    </div>
   );
 }
 

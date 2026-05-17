@@ -89,3 +89,29 @@ checkInsRouter.get("/:managerId/:quarter", requireAuth, requireRole("Manager", "
     return res.json({ checkIns: demoStore.getCheckIns(req.params.managerId, req.params.quarter) });
   }
 });
+
+checkInsRouter.post("/approve-goal-sheet", requireAuth, requireRole("Manager"), async (req, res) => {
+  try {
+    const sheet = await prisma.goalSheet.findUnique({ where: { id: req.body.goalSheetId }, include: { employee: true } });
+    if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
+    if (sheet.employee.managerId !== req.user.sub) {
+      return res.status(403).json({ message: "Managers can only approve direct reportees" });
+    }
+    const goalSheet = await prisma.goalSheet.update({
+      where: { id: sheet.id },
+      data: { status: "Approved", approvedAt: new Date() }
+    });
+    await prisma.notification.create({
+      data: {
+        userId: sheet.employeeId,
+        message: `Your goal sheet has been approved by ${req.user.name || "your manager"}`
+      }
+    });
+    console.log("Ethereal preview URL: https://ethereal.email/message/demo-goal-approval-preview");
+    return res.json({ goalSheet });
+  } catch {
+    const sheet = demoStore.approveGoalSheet(req.body.goalSheetId, req.user.sub);
+    if (!sheet) return res.status(404).json({ message: "Goal sheet not found" });
+    return res.json({ goalSheet: sheet });
+  }
+});

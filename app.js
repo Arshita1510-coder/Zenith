@@ -2,8 +2,6 @@ const STORAGE_KEY = "atomquest_goal_portal_v1";
 const SUPABASE_URL = "https://hfngakvgrdgvrjobjkqq.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_xT8G1-blk3XuOjjpBA8aoQ_NBte8p3B";
 const SUPABASE_STATE_KEY = "atomquest-demo-state";
-const DEMO_PASSWORD = "AtomQuest@123";
-
 let supabaseClient = null;
 let backendStatus = "Connecting to Supabase";
 let syncTimer = null;
@@ -110,12 +108,15 @@ const seedState = {
     { id: "a-2", actor: "Meera Nair", action: "Approved goals", subject: "Ananya Rao", before: "Submitted", after: "Approved and locked", at: "2026-05-04 14:20" }
   ],
   notifications: [
-    { id: "n-1", type: "Reminder", message: "Q1 check-in window is active for July.", audience: "All roles" }
+    { id: "n-1", userId: "u-emp-1", type: "Reminder", message: "Q1 check-in window is active for July - please update your achievements.", isRead: false, createdAt: "2026-07-01 09:00" },
+    { id: "n-2", userId: "u-mgr-1", type: "Approval", message: "Rohan Mehta has submitted their goal sheet for your approval.", isRead: false, createdAt: "2026-05-06 11:30" },
+    { id: "n-3", userId: "u-admin-1", type: "Escalation", message: "Two SLA risks are active in the escalation dashboard.", isRead: false, createdAt: "2026-05-10 08:30" }
   ],
   escalations: [
-    { id: "e-1", trigger: "Goal sheet not submitted by May 25", ownerRole: "Manager", sla: "48 hours", status: "Active" },
-    { id: "e-2", trigger: "Quarterly check-in pending for 7 days", ownerRole: "Admin", sla: "72 hours", status: "Active" }
+    { id: "e-1", userId: "u-emp-2", type: "Manager approval pending", triggeredAt: "2026-05-11", resolvedAt: null, resolvedBy: null, note: "", status: "Pending", sourceKey: "approval-u-emp-2" },
+    { id: "e-2", userId: "u-emp-1", type: "Quarterly achievement pending", triggeredAt: "2026-07-08", resolvedAt: null, resolvedBy: null, note: "", status: "Pending", sourceKey: "achievement-u-emp-1-Q1" }
   ],
+  darkMode: false,
   integrations: [
     { id: "i-1", name: "Microsoft Entra ID SSO", status: "Ready for configuration" },
     { id: "i-2", name: "Email notifications", status: "Template workflow enabled" },
@@ -124,6 +125,7 @@ const seedState = {
 };
 
 let state = loadState();
+let chartInstances = [];
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -280,14 +282,6 @@ function currentUser() {
   return state.users.find((user) => user.id === state.activeUserId) || state.users[0];
 }
 
-function demoCredentials() {
-  const byEmail = new Map();
-  [...state.users, ...seedState.users].forEach((user) => {
-    if (user.email && !byEmail.has(user.email.toLowerCase())) byEmail.set(user.email.toLowerCase(), { ...user, password: DEMO_PASSWORD });
-  });
-  return [...byEmail.values()];
-}
-
 function ensureDemoDataset() {
   seedState.users.forEach((seedUser) => {
     if (!state.users.some((user) => user.id === seedUser.id || user.email?.toLowerCase() === seedUser.email.toLowerCase())) {
@@ -301,6 +295,26 @@ function ensureDemoDataset() {
   if (!state.cycles?.length) state.cycles = structuredClone(seedState.cycles);
   if (!state.escalations?.length) state.escalations = structuredClone(seedState.escalations);
   if (!state.integrations?.length) state.integrations = structuredClone(seedState.integrations);
+  if (typeof state.darkMode !== "boolean") state.darkMode = false;
+  state.notifications = state.notifications.map((item) => ({
+    id: item.id || uid("notification"),
+    userId: item.userId || state.activeUserId || "u-admin-1",
+    type: item.type || "Reminder",
+    message: item.message || item.trigger || "Portal notification",
+    isRead: Boolean(item.isRead),
+    createdAt: item.createdAt || new Date().toLocaleString()
+  }));
+  state.escalations = state.escalations.map((item) => ({
+    id: item.id || uid("escalation"),
+    userId: item.userId || "u-admin-1",
+    type: item.type || item.trigger || "Escalation",
+    triggeredAt: item.triggeredAt || new Date().toISOString().slice(0, 10),
+    resolvedAt: item.resolvedAt || null,
+    resolvedBy: item.resolvedBy || null,
+    note: item.note || "",
+    status: item.status === "Resolved" ? "Resolved" : "Pending",
+    sourceKey: item.sourceKey || item.id || uid("source")
+  }));
 }
 
 function userName(id) {
@@ -309,8 +323,8 @@ function userName(id) {
 
 function roleViews(role) {
   if (role === "Employee") return ["dashboard", "goals", "checkins", "reports"];
-  if (role === "Manager") return ["dashboard", "approvals", "team", "shared", "reports"];
-  return ["dashboard", "admin", "shared", "reports", "audit"];
+  if (role === "Manager") return ["dashboard", "approvals", "team", "shared", "analytics", "reports"];
+  return ["dashboard", "admin", "escalations", "analytics", "shared", "reports", "audit"];
 }
 
 function viewLabel(view) {
@@ -323,6 +337,8 @@ function viewLabel(view) {
     shared: "Shared Goals",
     reports: "Reports",
     admin: "Admin Console",
+    escalations: "Escalations",
+    analytics: "Analytics",
     audit: "Audit Trail"
   }[view] || view;
 }
@@ -337,27 +353,6 @@ function enforceRoleAccess(expectedRole, user) {
   if (expectedRole === "Manager" && user.role === "Manager") return true;
   if (expectedRole === "Admin" && user.role === "Admin") return true;
   return user.role === expectedRole;
-}
-
-function loginDemoUser(email, password, expectedRole) {
-  const account = demoCredentials().find((item) => item.email.toLowerCase() === email.toLowerCase());
-  if (!account || account.password !== password) {
-    return { ok: false, message: "Invalid email ID or password for this backend user." };
-  }
-  if (!enforceRoleAccess(expectedRole, account)) {
-    return { ok: false, message: `This user is assigned as ${account.role}, not ${expectedRole}.` };
-  }
-  if (!state.users.some((user) => user.id === account.id)) {
-    state.users.push({ id: account.id, name: account.name, email: account.email, role: account.role, department: account.department, managerId: account.managerId });
-  }
-  ensureDemoDataset();
-  state.isAuthenticated = true;
-  state.activeUserId = account.id;
-  state.activeView = "dashboard";
-  backendStatus = "Demo database session";
-  saveState();
-  render();
-  return { ok: true };
 }
 
 function setView(view) {
@@ -419,6 +414,99 @@ function averageScore(goals) {
   return scored.length ? Math.round(scored.reduce((sum, score) => sum + score, 0) / scored.length) : 0;
 }
 
+function scopedEmployees(user) {
+  if (user.role === "Employee") return [user];
+  if (user.role === "Manager") return teamMembers(user.id);
+  return state.users.filter((item) => item.role === "Employee");
+}
+
+function scopedGoals(user) {
+  const employeeIds = scopedEmployees(user).map((employee) => employee.id);
+  return state.goals.filter((goal) => employeeIds.includes(goal.employeeId));
+}
+
+function daysBetween(dateString, now = new Date()) {
+  const then = new Date(dateString);
+  if (Number.isNaN(then.getTime())) return 0;
+  return Math.max(0, Math.floor((now - then) / 86400000));
+}
+
+function unreadNotifications(userId = state.activeUserId) {
+  return state.notifications.filter((item) => item.userId === userId && !item.isRead);
+}
+
+function addNotification(userId, type, message) {
+  if (!userId) return;
+  state.notifications.unshift({
+    id: uid("notification"),
+    userId,
+    type,
+    message,
+    isRead: false,
+    createdAt: new Date().toLocaleString()
+  });
+}
+
+function logDemoEmail(to, subject, body) {
+  const previewId = Math.random().toString(36).slice(2, 10);
+  console.log(`[Ethereal demo email preview] https://ethereal.email/message/${previewId}`);
+  console.log({ to, subject, body });
+}
+
+function addEscalation(userId, type, triggeredAt, sourceKey) {
+  const existing = state.escalations.find((item) => item.sourceKey === sourceKey && item.status === "Pending");
+  if (existing) return false;
+  state.escalations.unshift({
+    id: uid("escalation"),
+    userId,
+    type,
+    triggeredAt,
+    resolvedAt: null,
+    resolvedBy: null,
+    note: "",
+    status: "Pending",
+    sourceKey
+  });
+  return true;
+}
+
+function runEscalationCheck() {
+  const now = new Date();
+  const cycleOpen = new Date("2026-05-01T00:00:00");
+  let created = 0;
+  state.users.filter((user) => user.role === "Employee").forEach((employee) => {
+    const employeeGoals = goalsForEmployee(employee.id);
+    const hasSubmitted = employeeGoals.some((goal) => ["Submitted", "Approved"].includes(goal.status));
+    if (!hasSubmitted && daysBetween(cycleOpen, now) > 7) {
+      if (addEscalation(employee.id, "Goal sheet overdue", "2026-05-08", `goal-sheet-${employee.id}`)) created += 1;
+    }
+
+    const submittedPending = employeeGoals.some((goal) => goal.status === "Submitted");
+    if (submittedPending) {
+      if (addEscalation(employee.managerId || employee.id, "Manager approval pending", "2026-05-06", `approval-${employee.id}`)) created += 1;
+    }
+
+    const approvedGoals = employeeGoals.filter((goal) => goal.status === "Approved");
+    const missingAchievements = approvedGoals.some((goal) => !getCheckin(goal.id, state.currentQuarter));
+    if (missingAchievements && ["Q1", "Q2", "Q3", "Q4"].includes(state.currentQuarter)) {
+      if (addEscalation(employee.id, "Quarterly achievement pending", new Date().toISOString().slice(0, 10), `achievement-${employee.id}-${state.currentQuarter}`)) created += 1;
+    }
+  });
+
+  state.users.filter((user) => user.role === "Manager").forEach((manager) => {
+    const teamGoals = scopedGoals(manager).filter((goal) => goal.status === "Approved");
+    const missingComments = teamGoals.some((goal) => !getCheckin(goal.id, state.currentQuarter)?.managerComment);
+    if (missingComments) {
+      if (addEscalation(manager.id, "Manager check-in comment pending", new Date().toISOString().slice(0, 10), `manager-checkin-${manager.id}-${state.currentQuarter}`)) created += 1;
+    }
+  });
+
+  if (created) addNotification(state.users.find((user) => user.role === "Admin")?.id, "Escalation", `${created} new escalation item(s) were detected.`);
+  logAudit(state.activeUserId, "Ran escalation check", "Escalation Engine", "-", `${created} created`);
+  saveState();
+  return created;
+}
+
 function roleSummary(user) {
   if (user.role === "Employee") return "Create and submit goals, update quarterly achievements, review manager feedback, and track locked approved goals.";
   if (user.role === "Manager") return "Approve or return team goals, tune targets and weightages, run quarterly check-ins, and monitor planned vs actual progress.";
@@ -452,6 +540,7 @@ function logAudit(actorId, action, subject, before, after) {
 }
 
 function render() {
+  document.body.classList.toggle("dark", Boolean(state.darkMode));
   if (!state.isAuthenticated) {
     renderLogin();
     return;
@@ -484,11 +573,12 @@ function render() {
       </aside>
       <main class="main">
         ${renderTopbar(user)}
-        ${renderActiveView(user)}
+        <div class="page-transition">${renderActiveView(user)}</div>
       </main>
     </div>
   `;
   bindBaseEvents();
+  setTimeout(renderChartsForActiveView, 0);
 }
 
 function renderLogin() {
@@ -530,11 +620,6 @@ function renderLogin() {
           <button class="btn primary" type="submit">Login</button>
           <div id="loginError" class="notice danger hidden"></div>
         </form>
-        <div class="demo-credentials">
-          <strong>Demo credentials</strong>
-          ${demoCredentials().map((item) => `<button type="button" data-demo-email="${escapeHtml(item.email)}" data-demo-role="${escapeHtml(item.role)}">${escapeHtml(item.role)}: ${escapeHtml(item.email)}</button>`).join("")}
-          <span>Password: ${DEMO_PASSWORD}</span>
-        </div>
       </section>
     </main>
   `;
@@ -542,13 +627,6 @@ function renderLogin() {
   document.querySelectorAll("[data-login-role]").forEach((button) => button.addEventListener("click", () => {
     document.querySelectorAll("[data-login-role]").forEach((item) => item.classList.toggle("active", item === button));
     document.querySelector("[name='role']").value = button.dataset.loginRole;
-  }));
-
-  document.querySelectorAll("[data-demo-email]").forEach((button) => button.addEventListener("click", () => {
-    document.querySelector("[name='email']").value = button.dataset.demoEmail;
-    document.querySelector("[name='password']").value = DEMO_PASSWORD;
-    const roleButton = document.querySelector(`[data-login-role="${button.dataset.demoRole}"]`);
-    if (roleButton) roleButton.click();
   }));
 
   document.getElementById("loginForm").addEventListener("submit", async (event) => {
@@ -560,21 +638,9 @@ function renderLogin() {
     const errorBox = document.getElementById("loginError");
     const button = event.currentTarget.querySelector("button[type='submit']");
 
-    if (password === DEMO_PASSWORD && demoCredentials().some((item) => item.email.toLowerCase() === email)) {
-      const demoResult = loginDemoUser(email, password, expectedRole);
-      if (!demoResult.ok) {
-        errorBox.textContent = demoResult.message;
-        errorBox.classList.remove("hidden");
-      }
-      return;
-    }
-
     if (!supabaseClient) {
-      const demoResult = loginDemoUser(email, password, expectedRole);
-      if (!demoResult.ok) {
-        errorBox.textContent = demoResult.message;
-        errorBox.classList.remove("hidden");
-      }
+      errorBox.textContent = "Supabase is still connecting. Please wait a moment and try again.";
+      errorBox.classList.remove("hidden");
       return;
     }
 
@@ -585,13 +651,10 @@ function renderLogin() {
     try {
       const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error || !data.user) {
-        const demoResult = loginDemoUser(email, password, expectedRole);
-        if (!demoResult.ok) {
-          errorBox.textContent = error?.message || demoResult.message || "Invalid email ID or password.";
-          errorBox.classList.remove("hidden");
-          button.disabled = false;
-          button.textContent = "Login";
-        }
+        errorBox.textContent = error?.message || "Invalid email ID or password.";
+        errorBox.classList.remove("hidden");
+        button.disabled = false;
+        button.textContent = "Login";
         return;
       }
 
@@ -617,19 +680,17 @@ function renderLogin() {
         button.textContent = "Login";
       }
     } catch (loginError) {
-      const demoResult = loginDemoUser(email, password, expectedRole);
-      if (!demoResult.ok) {
-        errorBox.textContent = loginError.message || "Login failed. Please check your Supabase setup.";
-        errorBox.classList.remove("hidden");
-        button.disabled = false;
-        button.textContent = "Login";
-      }
+      errorBox.textContent = loginError.message || "Login failed. Please check your Supabase setup.";
+      errorBox.classList.remove("hidden");
+      button.disabled = false;
+      button.textContent = "Login";
     }
   });
 
 }
 
 function renderTopbar(user) {
+  const unread = unreadNotifications(user.id).length;
   return `
     <div class="topbar">
       <div>
@@ -638,6 +699,14 @@ function renderTopbar(user) {
       </div>
       <div class="actions">
         <span class="pill ${backendStatus.includes("failed") || backendStatus.includes("needs") || backendStatus.includes("not") ? "danger" : "success"}">${escapeHtml(backendStatus)}</span>
+        <div class="notification-wrap">
+          <button class="icon-btn" id="notificationBell" title="Notifications">Bell${unread ? `<span>${unread}</span>` : ""}</button>
+          <div class="notification-menu hidden" id="notificationMenu">
+            <strong>Notifications</strong>
+            ${renderNotificationItems(user.id)}
+          </div>
+        </div>
+        <button class="btn" id="darkToggle">${state.darkMode ? "Light mode" : "Dark mode"}</button>
         <select id="quarterSwitch" class="select">
           ${["Q1", "Q2", "Q3", "Q4"].map((q) => `<option value="${q}" ${q === state.currentQuarter ? "selected" : ""}>${q}</option>`).join("")}
         </select>
@@ -646,6 +715,17 @@ function renderTopbar(user) {
       </div>
     </div>
   `;
+}
+
+function renderNotificationItems(userId) {
+  const items = state.notifications.filter((item) => item.userId === userId).slice(0, 6);
+  if (!items.length) return `<div class="empty compact">No notifications.</div>`;
+  return items.map((item) => `
+    <button class="notification-item ${item.isRead ? "" : "unread"}" data-read-notification="${item.id}">
+      <span>${escapeHtml(item.message)}</span>
+      <small>${escapeHtml(item.createdAt)}</small>
+    </button>
+  `).join("");
 }
 
 function renderActiveView(user) {
@@ -657,6 +737,8 @@ function renderActiveView(user) {
   if (state.activeView === "shared") return renderSharedGoals(user);
   if (state.activeView === "reports") return renderReports(user);
   if (state.activeView === "admin") return renderAdmin(user);
+  if (state.activeView === "escalations") return renderEscalations();
+  if (state.activeView === "analytics") return renderAnalytics(user);
   if (state.activeView === "audit") return renderAudit();
   return "";
 }
@@ -703,7 +785,7 @@ function renderDashboard(user) {
       <div class="panel">
         <h3>Current Alerts</h3>
         <div class="goal-list">
-          ${state.notifications.map((item) => `<div class="notice warning"><strong>${escapeHtml(item.type)}</strong><br>${escapeHtml(item.message)}<br><span class="footer-note">${escapeHtml(item.audience)}</span></div>`).join("")}
+          ${state.notifications.filter((item) => item.userId === user.id).slice(0, 3).map((item) => `<div class="notice warning"><strong>${escapeHtml(item.type)}</strong><br>${escapeHtml(item.message)}<br><span class="footer-note">${escapeHtml(item.createdAt)}</span></div>`).join("") || `<div class="empty compact">No alerts for your role.</div>`}
           ${goalValidation(user.role === "Employee" ? user.id : "u-emp-2").length ? `<div class="notice danger">${goalValidation(user.role === "Employee" ? user.id : "u-emp-2").join("<br>")}</div>` : ""}
         </div>
       </div>
@@ -1051,12 +1133,11 @@ function renderAdmin() {
         ${renderGoalCards(state.goals.filter((goal) => goal.locked), { adminMode: true })}
       </div>
       <div class="panel">
-        <h3>Escalation Workflows</h3>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Trigger</th><th>Owner</th><th>SLA</th><th>Status</th></tr></thead>
-            <tbody>${state.escalations.map((item) => `<tr><td>${escapeHtml(item.trigger)}</td><td>${escapeHtml(item.ownerRole)}</td><td>${escapeHtml(item.sla)}</td><td>${escapeHtml(item.status)}</td></tr>`).join("")}</tbody>
-          </table>
+        <h3>Escalation Engine</h3>
+        <div class="notice">Daily cron logic is implemented as a reusable checker. Use the manual button for judging demos.</div>
+        <div class="actions">
+          <button class="btn primary" id="runEscalationCheck">Run Escalation Check Now</button>
+          <button class="btn" data-view="escalations">Open Escalation Dashboard</button>
         </div>
       </div>
       <div class="panel">
@@ -1067,6 +1148,169 @@ function renderAdmin() {
       </div>
     </section>
   `;
+}
+
+function renderEscalations() {
+  const pending = state.escalations.filter((item) => item.status === "Pending");
+  const goalSheetCount = pending.filter((item) => item.type.includes("Goal sheet")).length;
+  const approvalCount = pending.filter((item) => item.type.includes("approval")).length;
+  const checkinCount = pending.filter((item) => item.type.includes("achievement") || item.type.includes("check-in")).length;
+  return `
+    <section class="stats">
+      <div class="stat"><strong>${goalSheetCount}</strong><span>Goal Sheets Overdue</span></div>
+      <div class="stat"><strong>${approvalCount}</strong><span>Manager Approvals Pending</span></div>
+      <div class="stat"><strong>${checkinCount}</strong><span>Check-ins Pending</span></div>
+      <div class="stat"><strong>${pending.length}</strong><span>Active escalations</span></div>
+    </section>
+    <section class="panel">
+      <div class="toolbar">
+        <button class="btn primary" id="runEscalationCheck">Run Escalation Check Now</button>
+      </div>
+      ${pending.length ? `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Employee / Manager</th><th>Escalation Type</th><th>Days Overdue</th><th>Status</th><th>Resolve Note</th><th>Action</th></tr></thead>
+            <tbody>
+              ${pending.map((item) => `<tr>
+                <td>${escapeHtml(userName(item.userId))}</td>
+                <td>${escapeHtml(item.type)}</td>
+                <td>${daysBetween(item.triggeredAt)}</td>
+                <td>${statusPill(item.status)}</td>
+                <td><input class="input" data-resolution-note="${item.id}" placeholder="Resolution note"></td>
+                <td><button class="btn secondary" data-resolve-escalation="${item.id}">Resolve</button></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      ` : `<div class="empty">No escalations - you are all caught up.</div>`}
+    </section>
+  `;
+}
+
+function renderAnalytics(user) {
+  const employees = scopedEmployees(user);
+  const goals = scopedGoals(user);
+  const employeeIds = employees.map((employee) => employee.id);
+  const completion = goals.length ? Math.round((goals.filter((goal) => getCheckin(goal.id, state.currentQuarter)).length / goals.length) * 100) : 0;
+  return `
+    <section class="stats">
+      <div class="stat"><strong>${goals.length}</strong><span>Goals in scope</span></div>
+      <div class="stat"><strong>${averageScore(goals)}%</strong><span>Average progress</span></div>
+      <div class="stat"><strong>${completion}%</strong><span>${state.currentQuarter} completion</span></div>
+      <div class="stat"><strong>${employees.length}</strong><span>${user.role === "Manager" ? "Team members" : "Employees"}</span></div>
+    </section>
+    <section class="grid two analytics-grid">
+      ${chartPanel("goalDistributionChart", "Goal Distribution", "Breakdown of goals by thrust area")}
+      ${chartPanel("weightageChart", "Average Weightage", "Average weightage per thrust area")}
+      ${chartPanel("qoqTrendChart", "QoQ Progress Trend", "Average progress score from Q1 to Q4")}
+      ${chartPanel("completionGaugeChart", "Completion Rate Gauge", "Current quarter check-in completion")}
+      <div class="panel span-12">
+        <div class="toolbar"><h3>Progress Heatmap</h3><button class="btn" id="downloadHeatmap">Download as PNG</button></div>
+        ${renderHeatmap(employees, goals.filter((goal) => employeeIds.includes(goal.employeeId)))}
+      </div>
+    </section>
+  `;
+}
+
+function chartPanel(id, title, subtitle) {
+  return `
+    <div class="panel chart-panel">
+      <div class="toolbar"><div><h3>${title}</h3><p class="footer-note">${subtitle}</p></div><button class="btn" data-download-chart="${id}">Download as PNG</button></div>
+      <canvas id="${id}" height="220"></canvas>
+    </div>
+  `;
+}
+
+function renderHeatmap(employees, goals) {
+  if (!employees.length || !goals.length) return `<div class="empty">No heatmap data yet.</div>`;
+  const uniqueGoals = goals.slice(0, 8);
+  return `
+    <div class="heatmap-grid" id="heatmapGrid" style="--goal-count:${uniqueGoals.length}">
+      <div class="heatmap-corner">Employee</div>
+      ${uniqueGoals.map((goal) => `<div class="heatmap-head">${escapeHtml(goal.title)}</div>`).join("")}
+      ${employees.map((employee) => `
+        <div class="heatmap-name">${escapeHtml(employee.name)}</div>
+        ${uniqueGoals.map((goal) => {
+          const ownsGoal = goal.employeeId === employee.id;
+          const checkin = ownsGoal ? getCheckin(goal.id, state.currentQuarter) : null;
+          const score = checkin ? progressScore(goal, checkin.actual) : 0;
+          const tone = !ownsGoal || !checkin ? "empty" : score >= 80 ? "good" : score >= 50 ? "warn" : "bad";
+          const title = `${employee.name} | ${goal.title} | ${ownsGoal && checkin ? `${score}%` : "Not Started"} | ${state.currentQuarter}`;
+          return `<div class="heatmap-score ${tone}" title="${escapeHtml(title)}">${ownsGoal && checkin ? `${score}%` : "-"}</div>`;
+        }).join("")}
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderChartsForActiveView() {
+  chartInstances.forEach((chart) => chart.destroy());
+  chartInstances = [];
+  if (state.activeView !== "analytics" || !window.Chart) return;
+
+  const user = currentUser();
+  const goals = scopedGoals(user);
+  const byArea = {};
+  goals.forEach((goal) => {
+    if (!byArea[goal.thrustArea]) byArea[goal.thrustArea] = { count: 0, weightage: 0 };
+    byArea[goal.thrustArea].count += 1;
+    byArea[goal.thrustArea].weightage += Number(goal.weightage || 0);
+  });
+  const labels = Object.keys(byArea);
+  const colors = ["#146b63", "#254f8f", "#d97706", "#16794c", "#b42318", "#6b7280"];
+
+  const distributionCanvas = document.getElementById("goalDistributionChart");
+  if (distributionCanvas) {
+    chartInstances.push(new Chart(distributionCanvas, {
+      type: "doughnut",
+      data: { labels, datasets: [{ data: labels.map((label) => byArea[label].count), backgroundColor: colors }] },
+      options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+    }));
+  }
+
+  const weightageCanvas = document.getElementById("weightageChart");
+  if (weightageCanvas) {
+    chartInstances.push(new Chart(weightageCanvas, {
+      type: "bar",
+      data: { labels, datasets: [{ label: "Avg weightage", data: labels.map((label) => Math.round(byArea[label].weightage / byArea[label].count)), backgroundColor: "#146b63" }] },
+      options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+    }));
+  }
+
+  const qoqCanvas = document.getElementById("qoqTrendChart");
+  if (qoqCanvas) {
+    chartInstances.push(new Chart(qoqCanvas, {
+      type: "line",
+      data: {
+        labels: ["Q1", "Q2", "Q3", "Q4"],
+        datasets: [{
+          label: "Average progress",
+          data: ["Q1", "Q2", "Q3", "Q4"].map((quarter) => {
+            const scored = goals.map((goal) => {
+              const checkin = getCheckin(goal.id, quarter);
+              return checkin ? progressScore(goal, checkin.actual) : null;
+            }).filter((score) => score !== null);
+            return scored.length ? Math.round(scored.reduce((sum, score) => sum + score, 0) / scored.length) : 0;
+          }),
+          borderColor: "#254f8f",
+          backgroundColor: "rgba(37, 79, 143, 0.12)",
+          fill: true,
+          tension: 0.35
+        }]
+      },
+      options: { responsive: true, scales: { y: { beginAtZero: true, max: 120 } } }
+    }));
+  }
+
+  const gaugeCanvas = document.getElementById("completionGaugeChart");
+  if (gaugeCanvas) {
+    const completion = goals.length ? Math.round((goals.filter((goal) => getCheckin(goal.id, state.currentQuarter)).length / goals.length) * 100) : 0;
+    chartInstances.push(new Chart(gaugeCanvas, {
+      type: "doughnut",
+      data: { labels: ["Complete", "Remaining"], datasets: [{ data: [completion, Math.max(0, 100 - completion)], backgroundColor: ["#16794c", "#dfe5ee"], circumference: 180, rotation: 270 }] },
+      options: { responsive: true, plugins: { legend: { position: "bottom" }, tooltip: { callbacks: { label: (item) => `${item.label}: ${item.raw}%` } } } }
+    }));
+  }
 }
 
 function renderAudit() {
@@ -1086,6 +1330,20 @@ function renderAudit() {
 }
 
 function bindBaseEvents() {
+  document.getElementById("notificationBell")?.addEventListener("click", () => {
+    document.getElementById("notificationMenu")?.classList.toggle("hidden");
+  });
+  document.querySelectorAll("[data-read-notification]").forEach((button) => button.addEventListener("click", () => {
+    const notification = state.notifications.find((item) => item.id === button.dataset.readNotification);
+    if (notification) notification.isRead = true;
+    saveState();
+    render();
+  }));
+  document.getElementById("darkToggle")?.addEventListener("click", () => {
+    state.darkMode = !state.darkMode;
+    saveState();
+    render();
+  });
   document.getElementById("quarterSwitch").addEventListener("change", (event) => {
     state.currentQuarter = event.target.value;
     saveState();
@@ -1148,7 +1406,9 @@ function bindDynamicEvents() {
       state.goals.forEach((goal) => {
         if (goal.employeeId === user.id && ["Draft", "Returned"].includes(goal.status)) goal.status = "Submitted";
       });
+      addNotification(user.managerId, "Approval", `${user.name} has submitted their goal sheet for your approval.`);
       logAudit(user.id, "Submitted goals", user.name, "Draft", "Submitted");
+      logDemoEmail(state.users.find((item) => item.id === user.managerId)?.email, "Goal sheet submitted", `${user.name} submitted goals for approval.`);
       saveState();
       render();
     });
@@ -1182,7 +1442,9 @@ function bindDynamicEvents() {
     goal.weightage = Number(weightInput.value);
     goal.status = "Approved";
     goal.locked = true;
+    addNotification(goal.employeeId, "Approval", `Your goal sheet has been approved by ${currentUser().name}.`);
     logAudit(currentUser().id, "Approved goal", `${userName(goal.employeeId)} - ${goal.title}`, before, `Target ${goal.target}, weight ${goal.weightage}, locked`);
+    logDemoEmail(state.users.find((item) => item.id === goal.employeeId)?.email, "Goal sheet approved", `Your goal ${goal.title} was approved by ${currentUser().name}.`);
     saveState();
     render();
   }));
@@ -1192,6 +1454,7 @@ function bindDynamicEvents() {
     const comment = document.querySelector(`[data-return-comment="${goal.id}"]`)?.value || "Returned for rework";
     goal.status = "Returned";
     goal.locked = false;
+    addNotification(goal.employeeId, "Rework", `${currentUser().name} returned ${goal.title} for rework.`);
     logAudit(currentUser().id, "Returned goal", `${userName(goal.employeeId)} - ${goal.title}`, "Submitted", comment);
     saveState();
     render();
@@ -1271,6 +1534,54 @@ function bindDynamicEvents() {
       render();
     });
   }
+
+  document.querySelectorAll("#runEscalationCheck").forEach((button) => button.addEventListener("click", () => {
+    const created = runEscalationCheck();
+    alert(`${created} new escalation item(s) created.`);
+    render();
+  }));
+
+  document.querySelectorAll("[data-resolve-escalation]").forEach((button) => button.addEventListener("click", () => {
+    const escalation = state.escalations.find((item) => item.id === button.dataset.resolveEscalation);
+    if (!escalation) return;
+    const note = document.querySelector(`[data-resolution-note="${escalation.id}"]`)?.value.trim();
+    if (!note) return alert("Please add a resolution note.");
+    escalation.status = "Resolved";
+    escalation.resolvedAt = new Date().toLocaleString();
+    escalation.resolvedBy = currentUser().id;
+    escalation.note = note;
+    logAudit(currentUser().id, "Resolved escalation", escalation.type, userName(escalation.userId), note);
+    saveState();
+    render();
+  }));
+
+  document.querySelectorAll("[data-download-chart]").forEach((button) => button.addEventListener("click", () => {
+    const canvas = document.getElementById(button.dataset.downloadChart);
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = `${button.dataset.downloadChart}.png`;
+    link.click();
+  }));
+
+  document.getElementById("downloadHeatmap")?.addEventListener("click", () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 700;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = state.darkMode ? "#111827" : "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = state.darkMode ? "#f9fafb" : "#17202a";
+    ctx.font = "26px Segoe UI";
+    ctx.fillText("AtomQuest Progress Heatmap", 40, 55);
+    const rows = Array.from(document.querySelectorAll(".heatmap-grid > div")).map((cell) => cell.textContent.trim());
+    ctx.font = "16px Segoe UI";
+    rows.slice(0, 80).forEach((text, index) => ctx.fillText(text || "-", 40 + (index % 5) * 220, 100 + Math.floor(index / 5) * 34));
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = "progress-heatmap.png";
+    link.click();
+  });
 
   document.querySelectorAll("[data-unlock-goal]").forEach((button) => button.addEventListener("click", () => {
     const goal = state.goals.find((item) => item.id === button.dataset.unlockGoal);

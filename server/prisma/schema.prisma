@@ -62,6 +62,8 @@ model User {
   goalSheets   GoalSheet[] @relation("EmployeeGoalSheets")
   checkIns     CheckIn[]   @relation("ManagerCheckIns")
   auditLogs    AuditLog[]  @relation("ChangedByUser")
+  escalations  Escalation[]
+  notifications Notification[]
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 }
@@ -150,4 +152,25 @@ model AuditLog {
   user              User     @relation("ChangedByUser", fields: [changedBy], references: [id])
   changeDescription String
   changedAt         DateTime @default(now())
+}
+
+model Escalation {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  type        String
+  status      String    @default("Pending")
+  triggeredAt DateTime  @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  note        String?
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

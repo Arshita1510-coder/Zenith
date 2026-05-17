@@ -25,9 +25,9 @@ const goalSheets = employeeUsers.map((employee) => ({
   id: `goalsheet-${employee.id}-2026`,
   employeeId: employee.id,
   cycleYear: 2026,
-  status: "Approved",
-  submittedAt: "2026-06-20T10:00:00.000Z",
-  approvedAt: "2026-06-25T10:00:00.000Z"
+  status: employee.id === "demo-employee-3" ? "Draft" : employee.id === "demo-employee" ? "Submitted" : "Approved",
+  submittedAt: employee.id === "demo-employee-3" ? null : "2026-04-20T10:00:00.000Z",
+  approvedAt: employee.id === "demo-employee-2" ? "2026-04-25T10:00:00.000Z" : null
 }));
 
 const goals = goalSheets.flatMap((sheet) =>
@@ -49,6 +49,16 @@ const goals = goalSheets.flatMap((sheet) =>
 const achievements = [];
 const checkIns = [];
 const auditLogs = [];
+const escalations = [];
+const notifications = [
+  {
+    id: "notif-q2-open",
+    userId: "demo-employee",
+    message: "Q2 check-in window is now open - please update your achievements",
+    isRead: false,
+    createdAt: new Date().toISOString()
+  }
+];
 const windows = quarters.map((quarter) => ({
   quarter,
   isOpen: quarter === "Q1" || quarter === "Q2" || isQuarterOpenByCalendar(quarter),
@@ -90,6 +100,14 @@ function addAchievement(goalId, quarter, actual, progressStatus) {
     submittedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
+}
+
+function daysBetween(start, end) {
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
+}
+
+function daysSinceCycleOpen(now) {
+  return daysBetween(new Date(`${activeCycleYear}-04-01T00:00:00.000Z`), now);
 }
 
 function publicUser(user) {
@@ -413,6 +431,157 @@ export const demoStore = {
         (!employeeName || log.employeeName?.toLowerCase().includes(employeeName.toLowerCase()))
       );
     });
+  },
+
+  runEscalationCheck() {
+    const now = new Date();
+    const checks = [];
+    const activeQuarter = windows.find((window) => window.isOpen)?.quarter || "Q1";
+
+    users.filter((user) => user.role === "Employee").forEach((employee) => {
+      const sheet = goalSheets.find((item) => item.employeeId === employee.id);
+      if (!sheet?.submittedAt) {
+        checks.push({ userId: employee.id, type: "Goal Sheets Overdue", daysOverdue: daysSinceCycleOpen(now) - 7 });
+      }
+
+      const employeeGoals = goals.filter((goal) => goal.goalSheetId === sheet?.id);
+      const updated = employeeGoals.filter((goal) => achievements.some((achievement) => achievement.goalId === goal.id && achievement.quarter === activeQuarter));
+      if (activeQuarter && updated.length < employeeGoals.length) {
+        checks.push({ userId: employee.id, type: "Quarterly Achievements Pending", daysOverdue: 2 });
+      }
+    });
+
+    users.filter((user) => user.role === "Manager").forEach((manager) => {
+      const reportSheets = goalSheets.filter((sheet) => users.find((user) => user.id === sheet.employeeId)?.managerId === manager.id);
+      const missingCheckIns = reportSheets.filter((sheet) => !checkIns.some((checkIn) => checkIn.goalSheetId === sheet.id && checkIn.quarter === activeQuarter && checkIn.isCompleted));
+      if (missingCheckIns.length) {
+        checks.push({ userId: manager.id, type: "Manager Check-ins Pending", daysOverdue: 3 });
+      }
+    });
+
+    const submittedPending = goalSheets.filter((sheet) => sheet.submittedAt && !sheet.approvedAt);
+    submittedPending.forEach((sheet) => {
+      const employee = users.find((user) => user.id === sheet.employeeId);
+      const daysOverdue = daysBetween(new Date(sheet.submittedAt), now) - 5;
+      if (employee?.managerId && daysOverdue > 0) checks.push({ userId: employee.managerId, type: "Manager Approvals Pending", daysOverdue });
+    });
+
+    checks.forEach((check) => {
+      const exists = escalations.find((item) => item.userId === check.userId && item.type === check.type && item.status === "Pending");
+      if (!exists) {
+        escalations.push({
+          id: `esc-${escalations.length + 1}`,
+          ...check,
+          status: "Pending",
+          triggeredAt: now.toISOString(),
+          resolvedAt: null,
+          resolvedBy: null,
+          note: ""
+        });
+        notifications.push({
+          id: `notif-esc-${notifications.length + 1}`,
+          userId: "demo-admin",
+          message: `Escalation triggered: ${check.type}`,
+          isRead: false,
+          createdAt: now.toISOString()
+        });
+      }
+    });
+
+    console.log("Ethereal preview URL: https://ethereal.email/message/demo-escalation-preview");
+    return this.getEscalations();
+  },
+
+  getEscalations() {
+    const rows = escalations.map((item) => {
+      const user = users.find((user) => user.id === item.userId);
+      return { ...item, userName: user?.name || "Unknown", userRole: user?.role || "Unknown" };
+    });
+    const summary = rows
+      .filter((item) => item.status === "Pending")
+      .reduce((acc, item) => ({ ...acc, [item.type]: (acc[item.type] || 0) + 1 }), {});
+    return { escalations: rows, summary };
+  },
+
+  resolveEscalation(id, { note, resolvedBy }) {
+    const escalation = escalations.find((item) => item.id === id);
+    if (!escalation) return null;
+    escalation.status = "Resolved";
+    escalation.note = note || "";
+    escalation.resolvedBy = resolvedBy;
+    escalation.resolvedAt = new Date().toISOString();
+    return escalation;
+  },
+
+  getNotifications(userId) {
+    return notifications.filter((item) => item.userId === userId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  markNotificationRead(id) {
+    const notification = notifications.find((item) => item.id === id);
+    if (!notification) return null;
+    notification.isRead = true;
+    return notification;
+  },
+
+  approveGoalSheet(goalSheetId, managerId) {
+    const sheet = goalSheets.find((item) => item.id === goalSheetId);
+    if (!sheet) return null;
+    sheet.status = "Approved";
+    sheet.approvedAt = new Date().toISOString();
+    const manager = users.find((item) => item.id === managerId);
+    notifications.push({
+      id: `notif-approved-${notifications.length + 1}`,
+      userId: sheet.employeeId,
+      message: `Your goal sheet has been approved by ${manager?.name || "your manager"}`,
+      isRead: false,
+      createdAt: new Date().toISOString()
+    });
+    console.log("Ethereal preview URL: https://ethereal.email/message/demo-goal-approval-preview");
+    return sheet;
+  },
+
+  getAnalytics({ managerId, quarter = "Q1" } = {}) {
+    const scopedGoals = goals.filter((goal) => {
+      const employee = employeeForGoal(goal);
+      return !managerId || employee?.managerId === managerId;
+    });
+    const thrustAreas = [...new Set(scopedGoals.map((goal) => goal.thrustArea))];
+    const employees = users.filter((user) => user.role === "Employee" && (!managerId || user.managerId === managerId));
+
+    const distribution = thrustAreas.map((area) => ({
+      name: area,
+      value: scopedGoals.filter((goal) => goal.thrustArea === area).length,
+      averageWeightage: Math.round(scopedGoals.filter((goal) => goal.thrustArea === area).reduce((sum, goal) => sum + goal.weightage, 0) / scopedGoals.filter((goal) => goal.thrustArea === area).length)
+    }));
+
+    const heatmap = employees.map((employee) => {
+      const sheet = goalSheets.find((item) => item.employeeId === employee.id);
+      return {
+        employeeId: employee.id,
+        employeeName: employee.name,
+        goals: goals
+          .filter((goal) => goal.goalSheetId === sheet?.id)
+          .map((goal) => {
+            const achievement = achievements.find((item) => item.goalId === goal.id && item.quarter === quarter);
+            return { goalId: goal.id, goalTitle: goal.title, quarter, score: achievement?.scorePercent ?? null, label: achievement?.scoreLabel || "Not Started" };
+          })
+      };
+    });
+
+    const trend = quarters.map((item) => {
+      const scores = scopedGoals
+        .map((goal) => achievements.find((achievement) => achievement.goalId === goal.id && achievement.quarter === item)?.scorePercent)
+        .filter((score) => Number.isFinite(score));
+      return { quarter: item, average: scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0 };
+    });
+
+    const completion = this.getCompletion({ managerId });
+    const activeQuarter = windows.find((window) => window.isOpen)?.quarter || quarter;
+    const card = completion.summaryCards.find((item) => item.quarter === activeQuarter) || completion.summaryCards[0];
+    const completionRate = card?.total ? Math.round((card.completed / card.total) * 100) : 0;
+
+    return { distribution, heatmap, trend, completionRate, activeQuarter };
   },
 
   reassignManager(userId, managerId, changedBy) {

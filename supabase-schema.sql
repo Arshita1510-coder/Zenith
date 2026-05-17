@@ -15,6 +15,25 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  message text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.escalations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  type text not null,
+  triggered_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  resolved_by uuid references public.profiles(id) on delete set null,
+  note text,
+  status text not null default 'Pending' check (status in ('Pending', 'Resolved'))
+);
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -42,6 +61,8 @@ for each row execute function public.handle_new_user();
 
 alter table public.app_state enable row level security;
 alter table public.profiles enable row level security;
+alter table public.notifications enable row level security;
+alter table public.escalations enable row level security;
 
 drop policy if exists "Allow public demo reads" on public.app_state;
 drop policy if exists "Allow authenticated app reads" on public.app_state;
@@ -77,6 +98,36 @@ using (true);
 
 drop policy if exists "Allow users to create own profile" on public.profiles;
 drop policy if exists "Allow users to update own profile" on public.profiles;
+
+drop policy if exists "Allow notification owner reads" on public.notifications;
+create policy "Allow notification owner reads"
+on public.notifications
+for select
+to authenticated
+using (auth.uid() = user_id);
+
+drop policy if exists "Allow notification owner updates" on public.notifications;
+create policy "Allow notification owner updates"
+on public.notifications
+for update
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "Allow authenticated escalation reads" on public.escalations;
+create policy "Allow authenticated escalation reads"
+on public.escalations
+for select
+to authenticated
+using (true);
+
+drop policy if exists "Allow authenticated escalation updates" on public.escalations;
+create policy "Allow authenticated escalation updates"
+on public.escalations
+for update
+to authenticated
+using (true)
+with check (true);
 
 -- Profile creation, role assignment, and hierarchy changes must be done by an Admin
 -- through the Supabase dashboard or a service-role backend API. The browser app

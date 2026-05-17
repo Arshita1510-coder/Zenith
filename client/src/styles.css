@@ -13,6 +13,87 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
+}
+
+main,
+section,
+article,
+aside,
+nav,
+div {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+main {
+  animation: page-in 180ms ease-out;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dark body,
+.dark .bg-\[\#f7f8f4\],
+.dark .bg-\[\#fbfcf8\] {
+  background-color: #101722;
+  color: #e6edf5;
+}
+
+.dark .bg-white {
+  background-color: #172131;
+  color: #e6edf5;
+}
+
+.dark .text-ink,
+.dark .fill-\[\#18212f\] {
+  color: #e6edf5;
+  fill: #e6edf5;
+}
+
+.dark .text-\[\#536272\],
+.dark .text-\[\#586575\],
+.dark .text-\[\#697789\],
+.dark .text-\[\#7a8795\] {
+  color: #aebaca;
+}
+
+.dark .border-\[\#dce4d8\],
+.dark .border-\[\#cfd9cf\],
+.dark .border-\[\#edf1eb\] {
+  border-color: #2b3849;
+}
+
+.dark .bg-\[\#e6f4ed\] {
+  background-color: #143b2b;
+  color: #9de2bf;
+}
+
+.dark .bg-\[\#eef2f6\],
+.dark .bg-\[\#f1f4ef\],
+.dark .bg-\[\#edf1eb\] {
+  background-color: #223044;
+  color: #c7d2df;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #101722;
+  color: #e6edf5;
+  border-color: #2b3849;
 }
