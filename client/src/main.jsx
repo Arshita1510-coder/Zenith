@@ -1235,6 +1235,7 @@ function ManagerNav({ view, setView }) {
 
 function SharedGoalsCenter({ currentUser, triggerPreview }) {
   const [employees, setEmployees] = useState([]);
+  const [sharedGoals, setSharedGoals] = useState([]);
   const [form, setForm] = useState({
     thrustArea: "Business",
     title: "",
@@ -1249,22 +1250,50 @@ function SharedGoalsCenter({ currentUser, triggerPreview }) {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    async function fetchEmployees() {
-      try {
-        const data = await api("/api/admin/users");
-        const filtered = data.users.filter((u) => u.role === "Employee");
-        setEmployees(filtered);
-        setForm((f) => ({
-          ...f,
-          assignees: filtered.map((e) => e.id)
-        }));
-      } catch (err) {
-        console.error("Failed to load employees for shared goals:", err);
-      }
+  async function loadData() {
+    try {
+      const usersData = await api("/api/admin/users");
+      const filtered = usersData.users.filter((u) => u.role === "Employee");
+      setEmployees(filtered);
+      
+      // Auto-select all employees by default
+      setForm((f) => ({
+        ...f,
+        assignees: filtered.map((e) => e.id)
+      }));
+
+      // Fetch goals to find shared ones
+      const goalsData = await api("/api/admin/goals");
+      const sharedMap = {};
+      (goalsData.goals || []).forEach(g => {
+        if (g.isShared) {
+          if (!sharedMap[g.title]) {
+            sharedMap[g.title] = {
+              title: g.title,
+              thrustArea: g.thrustArea,
+              uomType: g.uomType,
+              target: g.target,
+              weightage: g.weightage,
+              description: g.description,
+              assigneesCount: 0,
+              assignees: []
+            };
+          }
+          sharedMap[g.title].assigneesCount += 1;
+          if (g.employee && g.employee.name) {
+            sharedMap[g.title].assignees.push(g.employee.name);
+          }
+        }
+      });
+      setSharedGoals(Object.values(sharedMap));
+    } catch (err) {
+      console.error("Failed to load Shared Goals Center data:", err);
     }
-    fetchEmployees();
-  }, []);
+  }
+
+  useEffect(() => {
+    loadData();
+  }, [message]);
 
   const handleSelectAll = (checked) => {
     if (checked) {
@@ -1331,6 +1360,16 @@ function SharedGoalsCenter({ currentUser, triggerPreview }) {
     }
   }
 
+  const getThrustColor = (area) => {
+    switch (area) {
+      case "Business": return "bg-[#e6f4ed] text-[#185e3d] border-[#a3e2c1]";
+      case "Customer": return "bg-[#eef2f6] text-[#2b6cb0] border-[#bee3f8]";
+      case "Operations": return "bg-[#fffaf0] text-[#dd6b20] border-[#fbd38d]";
+      case "People": return "bg-[#faf5ff] text-[#805ad5] border-[#e9d8fd]";
+      default: return "bg-[#f7fafc] text-[#4a5568] border-[#e2e8f0]";
+    }
+  };
+
   return (
     <div>
       <PageHeader 
@@ -1352,161 +1391,225 @@ function SharedGoalsCenter({ currentUser, triggerPreview }) {
         </div>
       )}
 
-      <div className="rounded-lg border border-[#dce4d8] bg-white p-6 shadow-sm">
-        <div className="mb-6">
-          <h3 className="text-xl font-bold flex items-center gap-2 text-[#247e57]">
-            <ShieldCheck size={22} />
-            Push shared goal
-          </h3>
-          <p className="text-xs text-[#536272] mt-1 leading-relaxed">
-            Assign a forced KPI to selected employees. Title and target are locked on their goal sheet; they can adjust weightage only (must still total 100% before submit).
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium">Title</span>
-              <input
-                className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
-                required
-                placeholder="KPI title"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-              />
-            </label>
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Left Column: Propagation Console */}
+        <div className="lg:col-span-7 rounded-lg border border-[#dce4d8] bg-white p-6 shadow-sm">
+          <div className="mb-6">
+            <h3 className="text-xl font-bold flex items-center gap-2 text-[#247e57]">
+              <ShieldCheck size={22} />
+              Push shared goal
+            </h3>
+            <p className="text-xs text-[#536272] mt-1 leading-relaxed">
+              Assign a forced KPI to selected employees. Title and target are locked on their goal sheet; they can adjust weightage only (must still total 100% before submit).
+            </p>
           </div>
 
-          <div>
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium">Description (optional)</span>
-              <textarea
-                className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none min-h-20 bg-white"
-                placeholder="Brief description"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium">Thrust area</span>
-              <select
-                className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
-                value={form.thrustArea}
-                onChange={(e) => setForm({ ...form, thrustArea: e.target.value })}
-              >
-                <option value="Business">Business</option>
-                <option value="Customer">Customer</option>
-                <option value="Operations">Operations</option>
-                <option value="People">People</option>
-                <option value="Compliance">Compliance</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium">UoM</span>
-              <select
-                className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
-                value={form.uomType}
-                onChange={(e) => setForm({ ...form, uomType: e.target.value })}
-              >
-                <option value="Min">Number</option>
-                <option value="Max">Percentage</option>
-                <option value="Timeline">Timeline</option>
-                <option value="Zero">Zero-based</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium">Target</span>
-              <input
-                className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
-                required
-                placeholder="e.g. 95, 2026-12-31, 0"
-                type={form.uomType === "Timeline" ? "date" : "text"}
-                value={form.target}
-                onChange={(e) => setForm({ ...form, target: e.target.value })}
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium">Default weightage (%)</span>
-              <input
-                className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
-                required
-                type="number"
-                min="10"
-                max="100"
-                placeholder="10-100"
-                value={form.weightage}
-                onChange={(e) => setForm({ ...form, weightage: e.target.value })}
-              />
-            </label>
-          </div>
-
-          <div className="space-y-2 border-t border-[#edf1eb] pt-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#536272]">Assign to</span>
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-[#247e57] cursor-pointer">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium">Title</span>
                 <input
-                  type="checkbox"
-                  checked={form.assignees.length === employees.length && employees.length > 0}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="rounded border-[#cfd9cf]"
+                  className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+                  required
+                  placeholder="KPI title"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
                 />
-                Select all
               </label>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-3 max-h-36 overflow-y-auto">
-              {employees.length > 0 ? (
-                employees.map((emp) => (
-                  <label key={emp.id} className="flex items-center gap-2 text-sm text-ink cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 p-1 rounded transition">
-                    <input
-                      type="checkbox"
-                      checked={form.assignees.includes(emp.id)}
-                      onChange={() => handleToggleAssignee(emp.id)}
-                      className="rounded border-[#cfd9cf] text-[#247e57]"
-                    />
-                    <span>{emp.name} <span className="text-xs text-[#7a8795]">({emp.department || "General"})</span></span>
-                  </label>
+
+            <div>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium">Description (optional)</span>
+                <textarea
+                  className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none min-h-20 bg-white"
+                  placeholder="Brief description"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium">Thrust area</span>
+                <select
+                  className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+                  value={form.thrustArea}
+                  onChange={(e) => setForm({ ...form, thrustArea: e.target.value })}
+                >
+                  <option value="Business">Business</option>
+                  <option value="Customer">Customer</option>
+                  <option value="Operations">Operations</option>
+                  <option value="People">People</option>
+                  <option value="Compliance">Compliance</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium">UoM</span>
+                <select
+                  className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+                  value={form.uomType}
+                  onChange={(e) => setForm({ ...form, uomType: e.target.value })}
+                >
+                  <option value="Min">Number</option>
+                  <option value="Max">Percentage</option>
+                  <option value="Timeline">Timeline</option>
+                  <option value="Zero">Zero-based</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium">Target</span>
+                <input
+                  className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+                  required
+                  placeholder="e.g. 95, 2026-12-31, 0"
+                  type={form.uomType === "Timeline" ? "date" : "text"}
+                  value={form.target}
+                  onChange={(e) => setForm({ ...form, target: e.target.value })}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium">Default weightage (%)</span>
+                <input
+                  className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+                  required
+                  type="number"
+                  min="10"
+                  max="100"
+                  placeholder="10-100"
+                  value={form.weightage}
+                  onChange={(e) => setForm({ ...form, weightage: e.target.value })}
+                />
+              </label>
+            </div>
+
+            <div className="space-y-2 border-t border-[#edf1eb] pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#536272]">Assign to</span>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-[#247e57] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.assignees.length === employees.length && employees.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="rounded border-[#cfd9cf]"
+                  />
+                  Select all
+                </label>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-3 max-h-36 overflow-y-auto">
+                {employees.length > 0 ? (
+                  employees.map((emp) => (
+                    <label key={emp.id} className="flex items-center gap-2 text-sm text-ink cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 p-1 rounded transition">
+                      <input
+                        type="checkbox"
+                        checked={form.assignees.includes(emp.id)}
+                        onChange={() => handleToggleAssignee(emp.id)}
+                        className="rounded border-[#cfd9cf] text-[#247e57]"
+                      />
+                      <span>{emp.name} <span className="text-xs text-[#7a8795]">({emp.department || "General"})</span></span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-xs text-[#7a8795] col-span-2">No employees found.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <label className="block">
+                <span className="mb-2 block text-xs font-medium">Primary owner</span>
+                <select
+                  className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
+                  value={form.primaryOwnerId}
+                  onChange={(e) => setForm({ ...form, primaryOwnerId: e.target.value })}
+                >
+                  <option value="">Unassigned</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="pt-4">
+              <button
+                className="w-full rounded-md bg-ink hover:opacity-90 py-2.5 text-sm font-semibold text-white transition flex items-center justify-center gap-2 disabled:opacity-50"
+                disabled={isSubmitting}
+                type="submit"
+              >
+                <ShieldCheck size={16} />
+                {isSubmitting ? "Propagating Goals..." : "Push shared goal"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Right Column: Information & Active Inventory */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="rounded-lg border border-[#dce4d8] bg-white p-6 shadow-sm">
+            <h4 className="text-base font-bold text-[#247e57] flex items-center gap-2 mb-3">
+              <ShieldCheck size={18} />
+              Enterprise KPI Inventory
+            </h4>
+            <p className="text-xs text-[#536272] mb-4 leading-relaxed">
+              Below are the active corporate KPIs currently propagated and locked across employee goal sheets.
+            </p>
+
+            <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+              {sharedGoals.length > 0 ? (
+                sharedGoals.map((goal, idx) => (
+                  <div key={idx} className="rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-4 transition hover:border-[#cfd9cf] hover:shadow-xs">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h5 className="text-sm font-bold text-ink leading-snug">{goal.title}</h5>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getThrustColor(goal.thrustArea)}`}>
+                        {goal.thrustArea}
+                      </span>
+                    </div>
+                    {goal.description && (
+                      <p className="text-xs text-[#536272] mb-3 line-clamp-2">{goal.description}</p>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 text-xs border-t border-[#edf1eb] pt-3 text-[#536272]">
+                      <div>
+                        <span className="font-semibold text-ink">Target:</span> {goal.target}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-ink">Weightage:</span> {goal.weightage}%
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-[11px] text-[#247e57] font-semibold bg-[#e6f4ed] px-2.5 py-1 rounded-md">
+                      <span>{goal.assigneesCount} Assignees</span>
+                      <span className="text-[10px] text-[#536272] font-normal truncate max-w-[150px]" title={goal.assignees.join(", ")}>
+                        {goal.assignees.join(", ")}
+                      </span>
+                    </div>
+                  </div>
                 ))
               ) : (
-                <p className="text-xs text-[#7a8795] col-span-2">No employees found.</p>
+                <div className="text-center py-8 border border-dashed border-[#dce4d8] rounded-lg">
+                  <ShieldCheck className="mx-auto text-[#cfd9cf] mb-2" size={32} />
+                  <p className="text-xs text-[#7a8795]">No shared goals propagated yet.</p>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="pt-2">
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium">Primary owner</span>
-              <select
-                className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm outline-none bg-white"
-                value={form.primaryOwnerId}
-                onChange={(e) => setForm({ ...form, primaryOwnerId: e.target.value })}
-              >
-                <option value="">Unassigned</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {/* Governance Policy Box */}
+          <div className="rounded-lg border border-[#edf1eb] bg-[#fbfcf8] p-5 border-l-4 border-l-[#247e57] shadow-sm">
+            <h5 className="text-xs font-bold uppercase tracking-wider text-[#247e57] mb-2.5">KPI Governance Policy</h5>
+            <ul className="text-xs text-[#536272] space-y-2.5 list-disc pl-4 leading-relaxed">
+              <li><strong>Mandatory Alignment:</strong> Corporate goals cannot be deleted or bypassed by employees.</li>
+              <li><strong>Locked Attributes:</strong> Goal Title, Description, and Targets are locked from edits.</li>
+              <li><strong>Flexible Weighting:</strong> Employees can adjust weightage to fit local context (totaling 100%).</li>
+              <li><strong>Audit Logging:</strong> Every corporate goal propagation is permanently recorded for regulatory audit purposes.</li>
+            </ul>
           </div>
-
-          <div className="pt-4">
-            <button
-              className="w-full rounded-md bg-ink hover:opacity-90 py-2.5 text-sm font-semibold text-white transition flex items-center justify-center gap-2 disabled:opacity-50"
-              disabled={isSubmitting}
-              type="submit"
-            >
-              <ShieldCheck size={16} />
-              {isSubmitting ? "Propagating Goals..." : "Push shared goal"}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );
