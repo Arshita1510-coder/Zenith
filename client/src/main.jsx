@@ -757,11 +757,11 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
                   </div>
                 )}
                 <div className="grid gap-3 md:grid-cols-6">
-                  <Input label="Title" value={goal.title} onChange={(value) => updateDraft(index, "title", value)} disabled={isFieldDisabled} />
-                  <Input label="Thrust Area" value={goal.thrustArea} onChange={(value) => updateDraft(index, "thrustArea", value)} disabled={isFieldDisabled} />
-                  <Select label="UoM" value={goal.uomType} onChange={(value) => updateDraft(index, "uomType", value)} options={[["Min", "Min"], ["Max", "Max"], ["Timeline", "Timeline"], ["Zero", "Zero"]]} disabled={isFieldDisabled} />
-                  <Input label="Target" type={goal.uomType === "Timeline" ? "date" : "text"} value={goal.target} onChange={(value) => updateDraft(index, "target", value)} disabled={isFieldDisabled} />
-                  <Input label="Weightage" type="number" value={goal.weightage} onChange={(value) => updateDraft(index, "weightage", value)} disabled={isFieldDisabled} />
+                  <Input label="Title" value={goal.title} onChange={(value) => updateDraft(index, "title", value)} disabled={isFieldDisabled} placeholder="e.g. Enhance site stability" />
+                  <Select label="Thrust Area" value={goal.thrustArea} onChange={(value) => updateDraft(index, "thrustArea", value)} options={[["Business", "Business"], ["Customer", "Customer"], ["Operations", "Operations"], ["People", "People"], ["Compliance", "Compliance"]]} disabled={isFieldDisabled} />
+                  <Select label="UoM" value={goal.uomType} onChange={(value) => updateDraft(index, "uomType", value)} options={[["Min", "Number"], ["Max", "Percentage"], ["Timeline", "Timeline"], ["Zero", "Zero-based"]]} disabled={isFieldDisabled} />
+                  <Input label="Target" type={goal.uomType === "Timeline" ? "date" : "text"} value={goal.target} onChange={(value) => updateDraft(index, "target", value)} disabled={isFieldDisabled} placeholder="e.g. 95, 2026-12-31, 0" />
+                  <Input label="Weightage" type="number" value={goal.weightage} onChange={(value) => updateDraft(index, "weightage", value)} disabled={isFieldDisabled} placeholder="10-100" />
                   <div className="flex items-end">
                     <button className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-sm font-semibold disabled:opacity-50" disabled={isFieldDisabled || draftGoals.length === 1} onClick={() => setDraftGoals((current) => current.filter((_, goalIndex) => goalIndex !== index))} type="button">Remove</button>
                   </div>
@@ -884,7 +884,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
 }
 
 function newDraftGoal() {
-  return { id: "", title: "", thrustArea: "Growth", description: "", uomType: "Min", target: "", weightage: 20, isShared: false };
+  return { id: "", title: "", thrustArea: "Business", description: "", uomType: "Min", target: "", weightage: 20, isShared: false };
 }
 
 function goalToDraft(goal) {
@@ -2245,7 +2245,7 @@ function Select({ label, value, onChange, options, disabled }) {
   );
 }
 
-function Input({ label, value, onChange, type = "text", disabled }) {
+function Input({ label, value, onChange, type = "text", disabled, placeholder }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-medium">{label}</span>
@@ -2253,6 +2253,7 @@ function Input({ label, value, onChange, type = "text", disabled }) {
         className="w-full rounded-md border border-[#cfd9cf] px-3 py-2 text-ink outline-none bg-white disabled:bg-[#f3f5f0] disabled:text-[#536272] disabled:opacity-100" 
         type={type} 
         value={value} 
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)} 
         disabled={disabled}
       />
