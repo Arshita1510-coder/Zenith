@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
-    "build": "npm install --prefix client && npm run build --prefix client",
+    "build": "npx prisma generate --schema=server/prisma/schema.prisma && npm install --prefix client && npm run build --prefix client",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client",
     "prisma:generate": "npm run prisma:generate --prefix server",
     "prisma:migrate": "npm run prisma:migrate --prefix server",
