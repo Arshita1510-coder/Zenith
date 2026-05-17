@@ -25,10 +25,8 @@ if (!process.env.JWT_SECRET) {
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || origin === clientOrigin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error("Origin not allowed by CORS"));
+      // Allow all origins for the hackathon portal to ensure zero CORS blocks on Vercel or preview domains
+      return callback(null, true);
     }
   })
 );
