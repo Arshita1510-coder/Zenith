@@ -472,6 +472,7 @@ function App() {
 function NotificationBell({ user }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const bellRef = React.useRef(null);
 
   async function load() {
     if (!user?.id) return;
@@ -485,6 +486,20 @@ function NotificationBell({ user }) {
     return () => window.clearInterval(interval);
   }, [user?.id]);
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (bellRef.current && !bellRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
   async function markRead(notification) {
     await api(`/api/notifications/${notification.id}/read`, { method: "PUT", body: JSON.stringify({}) });
     await load();
@@ -493,7 +508,7 @@ function NotificationBell({ user }) {
   const unread = notifications.filter((item) => !item.isRead).length;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={bellRef}>
       <button className="relative rounded-md border border-[#cfd9cf] bg-white p-2 hover:bg-slate-50 transition" onClick={() => setOpen((current) => !current)} type="button" aria-label="Notifications">
         <Bell size={18} />
         {unread ? <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#ec6b5f] text-xs font-bold text-white animate-bounce">{unread}</span> : null}
