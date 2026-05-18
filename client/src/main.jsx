@@ -56,9 +56,9 @@ const quarterMeta = {
 const statuses = ["NotStarted", "OnTrack", "Completed"];
 
 const demoUsers = [
-  { role: "Employee", email: "employee@atomquest.test", password: "Password123!" },
-  { role: "Manager", email: "manager@atomquest.test", password: "Password123!" },
-  { role: "Admin", email: "admin@atomquest.test", password: "Password123!" }
+  { role: "Employee", email: "employee@atomquest.com", password: "Password123!" },
+  { role: "Manager", email: "manager@atomquest.com", password: "Password123!" },
+  { role: "Admin", email: "admin@atomquest.com", password: "Password123!" }
 ];
 
 const routeByRole = {
@@ -429,7 +429,6 @@ function App() {
             </div>
             <div>
               <h2 className="text-xl font-semibold">Welcome back</h2>
-              <p className="text-sm text-[#697789]">Use any seeded demo account.</p>
             </div>
           </div>
 

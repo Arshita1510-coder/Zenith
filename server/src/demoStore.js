@@ -5,11 +5,11 @@ const demoPassword = "Password123!";
 let activeCycleYear = 2026;
 
 const users = [
-  { id: "demo-employee", name: "Emery Employee", email: "employee@atomquest.test", role: "Employee", managerId: "demo-manager", department: "Revenue" },
-  { id: "demo-employee-2", name: "Rowan Reporter", email: "rowan@atomquest.test", role: "Employee", managerId: "demo-manager", department: "Revenue" },
-  { id: "demo-employee-3", name: "Casey Contributor", email: "casey@atomquest.test", role: "Employee", managerId: "demo-manager", department: "Operations" },
-  { id: "demo-manager", name: "Morgan Manager", email: "manager@atomquest.test", role: "Manager", managerId: null, department: "Revenue" },
-  { id: "demo-admin", name: "Avery Admin", email: "admin@atomquest.test", role: "Admin", managerId: null, department: "People Ops" }
+  { id: "demo-employee", name: "Emery Employee", email: "employee@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Revenue" },
+  { id: "demo-employee-2", name: "Rowan Reporter", email: "rowan@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Revenue" },
+  { id: "demo-employee-3", name: "Casey Contributor", email: "casey@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Operations" },
+  { id: "demo-manager", name: "Morgan Manager", email: "manager@atomquest.com", role: "Manager", managerId: null, department: "Revenue" },
+  { id: "demo-admin", name: "Avery Admin", email: "admin@atomquest.com", role: "Admin", managerId: null, department: "People Ops" }
 ];
 
 const goalTemplates = [

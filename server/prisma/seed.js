@@ -29,7 +29,7 @@ async function main() {
   const manager = await prisma.user.create({
     data: {
       name: "Morgan Manager",
-      email: "manager@atomquest.test",
+      email: "manager@atomquest.com",
       role: Role.Manager,
       department: "Revenue & Sales Operations",
       passwordHash
@@ -39,7 +39,7 @@ async function main() {
   const employee = await prisma.user.create({
     data: {
       name: "Emery Employee",
-      email: "employee@atomquest.test",
+      email: "employee@atomquest.com",
       role: Role.Employee,
       managerId: manager.id,
       department: "Revenue & Sales Operations",
@@ -50,7 +50,7 @@ async function main() {
   const employee2 = await prisma.user.create({
     data: {
       name: "Rowan Reporter",
-      email: "rowan@atomquest.test",
+      email: "rowan@atomquest.com",
       role: Role.Employee,
       managerId: manager.id,
       department: "Revenue & Sales Operations",
@@ -61,7 +61,7 @@ async function main() {
   const employee3 = await prisma.user.create({
     data: {
       name: "Casey Contributor",
-      email: "casey@atomquest.test",
+      email: "casey@atomquest.com",
       role: Role.Employee,
       managerId: manager.id,
       department: "Corporate Operations",
@@ -72,7 +72,7 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       name: "Avery Admin",
-      email: "admin@atomquest.test",
+      email: "admin@atomquest.com",
       role: Role.Admin,
       department: "People Operations & Compliance",
       passwordHash
@@ -514,11 +514,11 @@ async function main() {
   console.info("🎉 SUPABASE DATABASE POPULATION SUCCESSFUL!");
   console.info("==============================================");
   console.info("Seeded live demo roles and logins:");
-  console.info(`1. Admin:    admin@atomquest.test    /  ${demoPassword} (Avery Admin)`);
-  console.info(`2. Manager:  manager@atomquest.test  /  ${demoPassword} (Morgan Manager)`);
-  console.info(`3. Employee: employee@atomquest.test /  ${demoPassword} (Emery Employee) -- Approved Goals & Q1/Q2 Data`);
-  console.info(`4. Employee: rowan@atomquest.test    /  ${demoPassword} (Rowan Reporter) -- Submitted & Pending Approval`);
-  console.info(`5. Employee: casey@atomquest.test    /  ${demoPassword} (Casey Contributor) -- Active Draft Status & Escalated`);
+  console.info(`1. Admin:    admin@atomquest.com    /  ${demoPassword} (Avery Admin)`);
+  console.info(`2. Manager:  manager@atomquest.com  /  ${demoPassword} (Morgan Manager)`);
+  console.info(`3. Employee: employee@atomquest.com /  ${demoPassword} (Emery Employee) -- Approved Goals & Q1/Q2 Data`);
+  console.info(`4. Employee: rowan@atomquest.com    /  ${demoPassword} (Rowan Reporter) -- Submitted & Pending Approval`);
+  console.info(`5. Employee: casey@atomquest.com    /  ${demoPassword} (Casey Contributor) -- Active Draft Status & Escalated`);
   console.info("==============================================\n");
 }
 
