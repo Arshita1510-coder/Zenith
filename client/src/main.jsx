@@ -637,6 +637,83 @@ function bandForScore(score) {
   return "red";
 }
 
+function WorkflowGuide() {
+  const [isOpen, setIsOpen] = useState(() => {
+    const saved = localStorage.getItem("zenith_workflow_guide_open");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  const toggle = () => {
+    setIsOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("zenith_workflow_guide_open", String(next));
+      return next;
+    });
+  };
+
+  return (
+    <div className="mb-6 rounded-xl border border-zinc-800 bg-[#121212] p-5 text-white shadow-lg transition-all duration-300">
+      <div className="flex items-center justify-between cursor-pointer select-none" onClick={toggle}>
+        <div className="flex items-center gap-2">
+          <Info size={18} className="text-[#a1a1aa]" />
+          <span className="font-semibold text-sm tracking-wide text-zinc-100 uppercase">Employee Workflow Guide</span>
+        </div>
+        <button
+          type="button"
+          aria-label="Toggle Guide"
+          className="text-zinc-400 hover:text-white transition-transform duration-300"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+        >
+          <ChevronDown size={18} />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="mt-5 grid gap-6 border-t border-zinc-800/60 pt-5 md:grid-cols-3 transition-all duration-300">
+          {/* Step 1 */}
+          <div className="flex gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 border border-zinc-700">
+              1
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100 text-sm">Draft Goals</h4>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Create up to 8 goals. Ensure your total weightage equals exactly 100%.
+              </p>
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="flex gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 border border-zinc-700">
+              2
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100 text-sm">Submit for Approval</h4>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Once submitted, goals go to your L1 Manager. If rejected, you must rework them.
+              </p>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="flex gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 border border-zinc-700">
+              3
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100 text-sm">Quarterly Check-ins</h4>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Log your actual achievements during active windows to track your progress.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
   const [quarter, setQuarter] = useState("Q1");
   const [dashboard, setDashboard] = useState(null);
@@ -750,6 +827,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
     return (
       <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goal Sheet" subtitle="Create annual goals and submit them for manager approval">
         <PageHeader title="Goal Sheet Builder" subtitle={`Status: ${formatStatus(dashboard.goalSheet.status)} · Total weightage ${draftTotal}%`} />
+        <WorkflowGuide />
         {dashboard.goalSheet.managerComment ? <Notice>Manager comment: {dashboard.goalSheet.managerComment}</Notice> : null}
         {message ? <Notice>{message}</Notice> : null}
         {validation ? <p className="mb-5 rounded-md bg-[#fff1f0] px-4 py-3 text-sm font-semibold text-[#a13a31]">{validation}</p> : null}
@@ -794,6 +872,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
 
   return (
     <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goals" subtitle="Locked approved goals and quarterly achievement updates">
+      <WorkflowGuide />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
       </div>
