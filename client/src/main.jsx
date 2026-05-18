@@ -22,7 +22,11 @@ import {
   UsersRound,
   AlertTriangle,
   Info,
-  ChevronDown
+  ChevronDown,
+  ArrowLeftRight,
+  Briefcase,
+  Users,
+  Shield
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -359,6 +363,23 @@ function App() {
     setError("");
   }
 
+  async function switchRole(roleName) {
+    const demoUser = demoUsers.find((u) => u.role === roleName);
+    if (!demoUser) return;
+    try {
+      const data = await api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: demoUser.email, password: demoUser.password })
+      });
+      localStorage.setItem("aq_token", data.token);
+      localStorage.setItem("aq_user", JSON.stringify(data.user));
+      window.history.pushState({}, "", routeByRole[data.user.role] || "/");
+      setUser(data.user);
+    } catch (e) {
+      console.error("Failed to switch role:", e);
+    }
+  }
+
   function logout() {
     localStorage.removeItem("aq_token");
     localStorage.removeItem("aq_user");
@@ -369,7 +390,7 @@ function App() {
   if (user?.role === "Employee") {
     return (
       <>
-        <EmployeeDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
+        <EmployeeDashboard user={user} onLogout={logout} onSwitchRole={switchRole} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
         {activePreview ? <PreviewDrawer preview={activePreview} onClose={() => setActivePreview(null)} /> : null}
       </>
     );
@@ -378,7 +399,7 @@ function App() {
   if (user?.role === "Manager") {
     return (
       <>
-        <ManagerDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
+        <ManagerDashboard user={user} onLogout={logout} onSwitchRole={switchRole} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
         {activePreview ? <PreviewDrawer preview={activePreview} onClose={() => setActivePreview(null)} /> : null}
       </>
     );
@@ -387,7 +408,7 @@ function App() {
   if (user?.role === "Admin") {
     return (
       <>
-        <AdminDashboard user={user} onLogout={logout} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
+        <AdminDashboard user={user} onLogout={logout} onSwitchRole={switchRole} darkMode={darkMode} setDarkMode={setDarkMode} triggerPreview={setActivePreview} />
         {activePreview ? <PreviewDrawer preview={activePreview} onClose={() => setActivePreview(null)} /> : null}
       </>
     );
@@ -536,7 +557,7 @@ function NotificationBell({ user }) {
   );
 }
 
-function Shell({ user, onLogout, children, icon, title, subtitle, darkMode, setDarkMode }) {
+function Shell({ user, onLogout, onSwitchRole, children, icon, title, subtitle, darkMode, setDarkMode }) {
   return (
     <main className="min-h-screen bg-[#f7f8f4] px-5 py-8 text-ink">
       <section className="mx-auto max-w-7xl">
@@ -560,6 +581,7 @@ function Shell({ user, onLogout, children, icon, title, subtitle, darkMode, setD
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {onSwitchRole && <SwitchRoleDropdown currentRole={user.role} onSwitchRole={onSwitchRole} />}
             <span className="rounded-full border border-[#dce4d8] bg-white px-3 py-2 text-sm">
               {user.name} · {user.role}
             </span>
@@ -635,6 +657,84 @@ function bandForScore(score) {
   if (score >= 80) return "green";
   if (score >= 50) return "amber";
   return "red";
+}
+
+function SwitchRoleDropdown({ currentRole, onSwitchRole }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const roles = [
+    { name: "Employee", icon: Briefcase, color: "bg-[#0c4a6e] hover:bg-[#075985] text-[#e0f2fe] border-[#0284c7]" },
+    { name: "Manager", icon: Users, color: "bg-[#3b0764] hover:bg-[#581c87] text-[#f3e8ff] border-[#7e22ce]" },
+    { name: "Admin", icon: Shield, color: "bg-[#b45309] hover:bg-[#d97706] text-[#fef3c7] border-[#d97706]" }
+  ];
+
+  return (
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-medium hover:bg-slate-50 transition"
+      >
+        <ArrowLeftRight size={16} />
+        Switch Role
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-zinc-800 bg-[#121212] p-5 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
+          <p className="mb-4 text-[11px] font-bold tracking-widest text-[#a1a1aa] uppercase">Demo Mode — Switch Role</p>
+          <div className="grid gap-3">
+            {roles.map((r) => {
+              const Icon = r.icon;
+              const isActive = currentRole === r.name;
+              return (
+                <button
+                  key={r.name}
+                  type="button"
+                  onClick={() => {
+                    onSwitchRole(r.name);
+                    setIsOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg border p-3.5 text-left transition-all ${
+                    isActive
+                      ? r.color + " ring-2 ring-white/20"
+                      : "bg-[#18181b] hover:bg-[#27272a] text-[#d4d4d8] border-zinc-800"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon size={18} className={isActive ? "text-white" : "text-[#a1a1aa]"} />
+                    <span className="text-sm font-semibold tracking-wide">{r.name}</span>
+                  </div>
+                  {isActive && (
+                    <span className="text-[10px] font-extrabold tracking-wider uppercase text-white bg-black/30 px-2 py-0.5 rounded">
+                      Active
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-4 text-[11px] leading-relaxed text-[#71717a]">
+            Instantly switch between demo accounts without logout.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function WorkflowGuide() {
@@ -791,7 +891,7 @@ function AdminWorkflowGuide() {
   );
 }
 
-function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
+function EmployeeDashboard({ user, onLogout, onSwitchRole, darkMode, setDarkMode, triggerPreview }) {
   const [quarter, setQuarter] = useState("Q1");
   const [dashboard, setDashboard] = useState(null);
   const [forms, setForms] = useState({});
@@ -902,7 +1002,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
   if (dashboard && !isApproved) {
     const readOnly = dashboard.goalSheet.status === "Submitted";
     return (
-      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goal Sheet" subtitle="Create annual goals and submit them for manager approval">
+      <Shell user={user} onLogout={onLogout} onSwitchRole={onSwitchRole} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goal Sheet" subtitle="Create annual goals and submit them for manager approval">
         <PageHeader title="Goal Sheet Builder" subtitle={`Status: ${formatStatus(dashboard.goalSheet.status)} · Total weightage ${draftTotal}%`} />
         <WorkflowGuide />
         {dashboard.goalSheet.managerComment ? <Notice>Manager comment: {dashboard.goalSheet.managerComment}</Notice> : null}
@@ -948,7 +1048,7 @@ function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevi
   }
 
   return (
-    <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goals" subtitle="Locked approved goals and quarterly achievement updates">
+    <Shell user={user} onLogout={onLogout} onSwitchRole={onSwitchRole} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="My Goals" subtitle="Locked approved goals and quarterly achievement updates">
       <WorkflowGuide />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
@@ -1107,7 +1207,7 @@ function ManagerWorkflowGuide() {
   );
 }
 
-function ManagerDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
+function ManagerDashboard({ user, onLogout, onSwitchRole, darkMode, setDarkMode, triggerPreview }) {
   const [view, setView] = useState("team");
   const [quarter, setQuarter] = useState("Q1");
   const [team, setTeam] = useState(null);
@@ -1214,7 +1314,7 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevie
 
   if (view === "reports") {
     return (
-      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<FileSpreadsheet size={22} />} title="Reports" subtitle="Achievement reporting for your direct team">
+      <Shell user={user} onLogout={onLogout} onSwitchRole={onSwitchRole} darkMode={darkMode} setDarkMode={setDarkMode} icon={<FileSpreadsheet size={22} />} title="Reports" subtitle="Achievement reporting for your direct team">
         <ManagerNav view={view} setView={setView} />
         <AchievementReport currentUser={user} managerOnly />
       </Shell>
@@ -1223,7 +1323,7 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevie
 
   if (view === "completion") {
     return (
-      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<ClipboardCheck size={22} />} title="Completion Dashboard" subtitle="Team check-in completion status">
+      <Shell user={user} onLogout={onLogout} onSwitchRole={onSwitchRole} darkMode={darkMode} setDarkMode={setDarkMode} icon={<ClipboardCheck size={22} />} title="Completion Dashboard" subtitle="Team check-in completion status">
         <ManagerNav view={view} setView={setView} />
         <CompletionDashboard currentUser={user} managerOnly />
       </Shell>
@@ -1232,7 +1332,7 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevie
 
   if (view === "analytics") {
     return (
-      <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="Analytics" subtitle="Team goal analytics and progress trends">
+      <Shell user={user} onLogout={onLogout} onSwitchRole={onSwitchRole} darkMode={darkMode} setDarkMode={setDarkMode} icon={<BarChart3 size={22} />} title="Analytics" subtitle="Team goal analytics and progress trends">
         <ManagerNav view={view} setView={setView} />
         <AnalyticsPage currentUser={user} managerOnly />
       </Shell>
@@ -1240,7 +1340,7 @@ function ManagerDashboard({ user, onLogout, darkMode, setDarkMode, triggerPrevie
   }
 
   return (
-    <Shell user={user} onLogout={onLogout} darkMode={darkMode} setDarkMode={setDarkMode} icon={<UsersRound size={22} />} title="My Team" subtitle="Direct reportee progress and structured quarterly check-ins">
+    <Shell user={user} onLogout={onLogout} onSwitchRole={onSwitchRole} darkMode={darkMode} setDarkMode={setDarkMode} icon={<UsersRound size={22} />} title="My Team" subtitle="Direct reportee progress and structured quarterly check-ins">
       <ManagerNav view={view} setView={setView} />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <QuarterPicker quarter={quarter} setQuarter={setQuarter} />
@@ -1785,7 +1885,7 @@ function SharedGoalsCenter({ currentUser, triggerPreview }) {
   );
 }
 
-function AdminDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
+function AdminDashboard({ user, onLogout, onSwitchRole, darkMode, setDarkMode, triggerPreview }) {
   const [view, setView] = useState("overview");
   const nav = [
     ["overview", "Overview", ClipboardCheck],
@@ -1822,10 +1922,13 @@ function AdminDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview 
               </button>
             ))}
           </div>
-          <button className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-medium" onClick={onLogout}>
-            <LogOut size={16} />
-            Log out
-          </button>
+          <div className="mt-8 grid gap-2">
+            {onSwitchRole && <SwitchRoleDropdown currentRole={user.role} onSwitchRole={onSwitchRole} />}
+            <button className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-medium" onClick={onLogout}>
+              <LogOut size={16} />
+              Log out
+            </button>
+          </div>
         </aside>
         <section className="p-6 lg:p-8">
           <AdminWorkflowGuide />
