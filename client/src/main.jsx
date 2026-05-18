@@ -659,7 +659,7 @@ function bandForScore(score) {
   return "red";
 }
 
-function SwitchRoleDropdown({ currentRole, onSwitchRole }) {
+function SwitchRoleDropdown({ currentRole, onSwitchRole, align = "right" }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = React.useRef(null);
 
@@ -695,7 +695,7 @@ function SwitchRoleDropdown({ currentRole, onSwitchRole }) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-zinc-800 bg-[#121212] p-5 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className={`absolute ${align === "left" ? "left-0" : "right-0"} z-50 mt-2 w-72 rounded-xl border border-zinc-800 bg-[#121212] p-5 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-150`}>
           <p className="mb-4 text-[11px] font-bold tracking-widest text-[#a1a1aa] uppercase">Demo Mode — Switch Role</p>
           <div className="grid gap-3">
             {roles.map((r) => {
@@ -1923,7 +1923,7 @@ function AdminDashboard({ user, onLogout, onSwitchRole, darkMode, setDarkMode, t
             ))}
           </div>
           <div className="mt-8 grid gap-2">
-            {onSwitchRole && <SwitchRoleDropdown currentRole={user.role} onSwitchRole={onSwitchRole} />}
+            {onSwitchRole && <SwitchRoleDropdown currentRole={user.role} onSwitchRole={onSwitchRole} align="left" />}
             <button className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#cfd9cf] bg-white px-4 py-2 text-sm font-medium" onClick={onLogout}>
               <LogOut size={16} />
               Log out
