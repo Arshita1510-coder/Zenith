@@ -2467,19 +2467,19 @@ function UserManagement() {
         </label>
         <div className="grid gap-3">
           {goals.slice(0, 5).map((goal) => (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#edf1eb] p-3 hover:bg-slate-50 transition" key={goal.id}>
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#edf1eb] p-3 hover:bg-slate-50 dark:border-[#2b3849] dark:hover:bg-slate-800/50 transition" key={goal.id}>
               <div className="flex items-center gap-3">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">{goal.employee.name}</span>
-                    <span className="text-[#a1b0c0] font-light">·</span>
-                    <span className="text-slate-600 font-medium">{goal.title}</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{goal.employee.name}</span>
+                    <span className="text-[#a1b0c0] dark:text-slate-600 font-light">·</span>
+                    <span className="text-slate-600 dark:text-slate-400 font-medium">{goal.title}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-[#697789]">{goal.thrustArea}</span>
-                    <span className="text-[#a1b0c0] font-light">·</span>
-                    <span className="text-xs text-[#697789]">{goal.uomType} UoM</span>
-                    <span className="text-[#a1b0c0] font-light">·</span>
+                    <span className="text-xs text-[#697789] dark:text-slate-400">{goal.thrustArea}</span>
+                    <span className="text-[#a1b0c0] dark:text-slate-600 font-light">·</span>
+                    <span className="text-xs text-[#697789] dark:text-slate-400">{goal.uomType} UoM</span>
+                    <span className="text-[#a1b0c0] dark:text-slate-600 font-light">·</span>
                     {goal.isLocked ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700">
                         <LockKeyhole size={10} /> Locked
