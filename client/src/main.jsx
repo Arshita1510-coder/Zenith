@@ -714,6 +714,83 @@ function WorkflowGuide() {
   );
 }
 
+function AdminWorkflowGuide() {
+  const [isOpen, setIsOpen] = useState(() => {
+    const saved = localStorage.getItem("zenith_admin_workflow_guide_open");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  const toggle = () => {
+    setIsOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("zenith_admin_workflow_guide_open", String(next));
+      return next;
+    });
+  };
+
+  return (
+    <div className="mb-6 rounded-xl border border-zinc-800 bg-[#121212] p-5 text-white shadow-lg transition-all duration-300">
+      <div className="flex items-center justify-between cursor-pointer select-none" onClick={toggle}>
+        <div className="flex items-center gap-2">
+          <Info size={18} className="text-[#a1a1aa]" />
+          <span className="font-semibold text-sm tracking-wide text-zinc-100 uppercase">Admin Workflow Guide</span>
+        </div>
+        <button
+          type="button"
+          aria-label="Toggle Guide"
+          className="text-zinc-400 hover:text-white transition-transform duration-300"
+          style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+        >
+          <ChevronDown size={18} />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div className="mt-5 grid gap-6 border-t border-zinc-800/60 pt-5 md:grid-cols-3 transition-all duration-300">
+          {/* Step 1 */}
+          <div className="flex gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 border border-zinc-700">
+              1
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100 text-sm">Cycle Management</h4>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Open and close quarterly check-in windows (e.g., Q1, Q2, Annual).
+              </p>
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="flex gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 border border-zinc-700">
+              2
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100 text-sm">Monitor Completion</h4>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Track which employees and managers are lagging behind in real-time.
+              </p>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="flex gap-3">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 border border-zinc-700">
+              3
+            </div>
+            <div>
+              <h4 className="font-semibold text-zinc-100 text-sm">Governance & Audit</h4>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                Override locked goals if necessary and export organizational achievement reports.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EmployeeDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview }) {
   const [quarter, setQuarter] = useState("Q1");
   const [dashboard, setDashboard] = useState(null);
@@ -1751,6 +1828,7 @@ function AdminDashboard({ user, onLogout, darkMode, setDarkMode, triggerPreview 
           </button>
         </aside>
         <section className="p-6 lg:p-8">
+          <AdminWorkflowGuide />
           {view === "overview" ? <CompletionDashboard currentUser={user} /> : null}
           {view === "reports" ? <AchievementReport currentUser={user} /> : null}
           {view === "escalations" ? <EscalationDashboard /> : null}
