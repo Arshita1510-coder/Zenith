@@ -452,7 +452,7 @@ function App() {
               <LockKeyhole size={22} />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Welcome back</h2>
+              <h2 className="text-xl font-semibold">Welcome</h2>
             </div>
           </div>
 
