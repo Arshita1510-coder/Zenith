@@ -329,7 +329,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [activePreview, setActivePreview] = useState(null);
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("zenith_dark") === "true");
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem("zenith_dark");
+    return saved !== null ? saved === "true" : true;
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
