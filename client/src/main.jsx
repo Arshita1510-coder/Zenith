@@ -60,9 +60,9 @@ const quarterMeta = {
 const statuses = ["NotStarted", "OnTrack", "Completed"];
 
 const demoUsers = [
-  { role: "Employee", email: "employee@atomquest.com", password: "Password123!" },
-  { role: "Manager", email: "manager@atomquest.com", password: "Password123!" },
-  { role: "Admin", email: "admin@atomquest.com", password: "Password123!" }
+  { role: "Employee", name: "Priya Sharma", email: "employee@atomquest.com", password: "Password123!" },
+  { role: "Manager", name: "Vikram Bose", email: "manager@atomquest.com", password: "Password123!" },
+  { role: "Admin", name: "Rahul Singhania", email: "admin@atomquest.com", password: "Password123!" }
 ];
 
 const routeByRole = {
@@ -421,7 +421,7 @@ function App() {
     <main className="min-h-screen bg-[#f7f8f4] text-ink">
       <section className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 gap-8 px-5 py-8 lg:grid-cols-[1fr_420px] lg:items-center">
         <div className="space-y-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#dce4d8] bg-white px-3 py-2 text-sm font-medium text-[#4f614d]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#dce4d8] bg-white px-3 py-2 text-sm font-medium text-[#4f614d] dark:border-[#2b3849] dark:bg-transparent dark:text-[#aebaca]">
             <ShieldCheck size={16} />
             JWT role access for quarterly check-ins
           </div>
@@ -434,19 +434,19 @@ function App() {
           <div className="grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
             {demoUsers.map((demoUser) => (
               <button
-                className="rounded-lg border border-[#dce4d8] bg-white p-4 text-left shadow-sm transition hover:border-[#3d8b67] hover:shadow-md"
+                className="rounded-lg border border-[#dce4d8] bg-white p-4 text-left shadow-sm transition hover:border-[#3d8b67] hover:shadow-md dark:border-[#2b3849] dark:bg-transparent dark:hover:border-[#3d8b67]"
                 key={demoUser.email}
                 onClick={() => selectDemoUser(demoUser)}
                 type="button"
               >
-                <span className="block text-sm font-semibold">{demoUser.role}</span>
-                <span className="mt-2 block break-all text-xs text-[#697789]">{demoUser.email}</span>
+                <span className="block text-sm font-semibold dark:text-white">{demoUser.role}</span>
+                <span className="mt-2 block break-all text-xs text-[#697789] dark:text-[#aebaca]">{demoUser.email}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <form className="rounded-lg border border-[#dce4d8] bg-white p-6 shadow-xl shadow-[#dce8df]/60" onSubmit={login}>
+        <form className="rounded-lg border border-[#dce4d8] bg-white p-6 shadow-xl shadow-[#dce8df]/60 dark:border-transparent dark:shadow-[0_0_40px_rgba(255,255,255,0.06)]" onSubmit={login}>
           <div className="mb-7 flex items-center gap-3">
             <div className="grid size-11 place-items-center rounded-lg bg-[#e6f4ed] text-[#247e57]">
               <LockKeyhole size={22} />
@@ -479,7 +479,7 @@ function App() {
           {error ? <p className="mb-4 rounded-md bg-[#fff1f0] px-3 py-2 text-sm text-[#a13a31]">{error}</p> : null}
 
           <button
-            className="flex w-full items-center justify-center gap-2 rounded-md bg-ink px-4 py-3 font-semibold text-white transition hover:bg-[#263349] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 px-4 py-3 font-semibold text-ink transition hover:text-[#263349] disabled:cursor-not-allowed disabled:opacity-60 dark:text-white dark:hover:text-[#aebaca]"
             disabled={isLoading}
             type="submit"
           >

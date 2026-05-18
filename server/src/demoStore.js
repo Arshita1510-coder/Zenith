@@ -5,11 +5,15 @@ const demoPassword = "Password123!";
 let activeCycleYear = 2026;
 
 const users = [
-  { id: "demo-employee", name: "Emery Employee", email: "employee@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Revenue" },
-  { id: "demo-employee-2", name: "Rowan Reporter", email: "rowan@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Revenue" },
-  { id: "demo-employee-3", name: "Casey Contributor", email: "casey@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Operations" },
-  { id: "demo-manager", name: "Morgan Manager", email: "manager@atomquest.com", role: "Manager", managerId: null, department: "Revenue" },
-  { id: "demo-admin", name: "Avery Admin", email: "admin@atomquest.com", role: "Admin", managerId: null, department: "People Ops" }
+  { id: "demo-employee", name: "Priya Sharma", email: "employee@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Engineering" },
+  { id: "demo-employee-2", name: "Rohan Mehta", email: "rohan@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Engineering" },
+  { id: "demo-employee-3", name: "Ananya Iyer", email: "ananya@atomquest.com", role: "Employee", managerId: "demo-manager", department: "Marketing" },
+  { id: "demo-employee-4", name: "Karan Malhotra", email: "karan@atomquest.com", role: "Employee", managerId: "demo-manager-2", department: "Sales" },
+  { id: "demo-employee-5", name: "Sneha Kulkarni", email: "sneha@atomquest.com", role: "Employee", managerId: "demo-manager-2", department: "Sales" },
+  { id: "demo-employee-6", name: "Arjun Nair", email: "arjun@atomquest.com", role: "Employee", managerId: "demo-manager-2", department: "Operations" },
+  { id: "demo-manager", name: "Vikram Bose", email: "manager@atomquest.com", role: "Manager", managerId: null, department: "Engineering" },
+  { id: "demo-manager-2", name: "Divya Kapoor", email: "divya@atomquest.com", role: "Manager", managerId: null, department: "Sales" },
+  { id: "demo-admin", name: "Rahul Singhania", email: "admin@atomquest.com", role: "Admin", managerId: null, department: "People Ops" }
 ];
 
 const goalTemplates = [

@@ -28,53 +28,96 @@ async function main() {
   console.info("Seeding corporate structure and users...");
   const manager = await prisma.user.create({
     data: {
-      name: "Morgan Manager",
+      name: "Vikram Bose",
       email: "manager@atomquest.com",
       role: Role.Manager,
-      department: "Revenue & Sales Operations",
+      department: "Engineering",
+      passwordHash
+    }
+  });
+
+  const manager2 = await prisma.user.create({
+    data: {
+      name: "Divya Kapoor",
+      email: "divya@atomquest.com",
+      role: Role.Manager,
+      department: "Sales",
       passwordHash
     }
   });
 
   const employee = await prisma.user.create({
     data: {
-      name: "Emery Employee",
+      name: "Priya Sharma",
       email: "employee@atomquest.com",
       role: Role.Employee,
       managerId: manager.id,
-      department: "Revenue & Sales Operations",
+      department: "Engineering",
       passwordHash
     }
   });
 
   const employee2 = await prisma.user.create({
     data: {
-      name: "Rowan Reporter",
-      email: "rowan@atomquest.com",
+      name: "Rohan Mehta",
+      email: "rohan@atomquest.com",
       role: Role.Employee,
       managerId: manager.id,
-      department: "Revenue & Sales Operations",
+      department: "Engineering",
       passwordHash
     }
   });
 
   const employee3 = await prisma.user.create({
     data: {
-      name: "Casey Contributor",
-      email: "casey@atomquest.com",
+      name: "Ananya Iyer",
+      email: "ananya@atomquest.com",
       role: Role.Employee,
       managerId: manager.id,
-      department: "Corporate Operations",
+      department: "Marketing",
+      passwordHash
+    }
+  });
+
+  const employee4 = await prisma.user.create({
+    data: {
+      name: "Karan Malhotra",
+      email: "karan@atomquest.com",
+      role: Role.Employee,
+      managerId: manager2.id,
+      department: "Sales",
+      passwordHash
+    }
+  });
+
+  const employee5 = await prisma.user.create({
+    data: {
+      name: "Sneha Kulkarni",
+      email: "sneha@atomquest.com",
+      role: Role.Employee,
+      managerId: manager2.id,
+      department: "Sales",
+      passwordHash
+    }
+  });
+
+  const employee6 = await prisma.user.create({
+    data: {
+      name: "Arjun Nair",
+      email: "arjun@atomquest.com",
+      role: Role.Employee,
+      managerId: manager2.id,
+      department: "Operations",
       passwordHash
     }
   });
 
   const admin = await prisma.user.create({
     data: {
-      name: "Avery Admin",
+      name: "Rahul Singhania",
       email: "admin@atomquest.com",
       role: Role.Admin,
-      department: "People Operations & Compliance",
+      department: "People Operations",
       passwordHash
     }
   });
@@ -395,6 +438,119 @@ async function main() {
     ]
   });
 
+  // --- ADDITIONAL EMPLOYEES: DRAFT GOAL SHEETS ---
+  console.info("Seeding Draft Goals for Karan Malhotra, Sneha Kulkarni, Arjun Nair...");
+  const karanSheet = await prisma.goalSheet.create({
+    data: {
+      employeeId: employee4.id,
+      cycleYear: 2026,
+      status: GoalSheetStatus.Draft
+    }
+  });
+
+  await prisma.goal.createMany({
+    data: [
+      {
+        goalSheetId: karanSheet.id,
+        thrustArea: "Sales Target",
+        title: "Q2 Core Revenue Focus",
+        description: "Engage and convert 5 high-value strategic leads.",
+        uomType: UomType.Min,
+        target: "5",
+        weightage: 50,
+        status: GoalStatus.Draft,
+        isShared: false,
+        isLocked: false
+      },
+      {
+        goalSheetId: karanSheet.id,
+        thrustArea: "Sales Operations",
+        title: "CRM Customer Update",
+        description: "Enforce complete compliance across client records.",
+        uomType: UomType.Zero,
+        target: "0",
+        weightage: 50,
+        status: GoalStatus.Draft,
+        isShared: true,
+        isLocked: false
+      }
+    ]
+  });
+
+  const snehaSheet = await prisma.goalSheet.create({
+    data: {
+      employeeId: employee5.id,
+      cycleYear: 2026,
+      status: GoalSheetStatus.Draft
+    }
+  });
+
+  await prisma.goal.createMany({
+    data: [
+      {
+        goalSheetId: snehaSheet.id,
+        thrustArea: "Sales Pipeline",
+        title: "Enterprise Deal Expansion",
+        description: "Upsell premium tiers to existing clients.",
+        uomType: UomType.Min,
+        target: "20000",
+        weightage: 60,
+        status: GoalStatus.Draft,
+        isShared: false,
+        isLocked: false
+      },
+      {
+        goalSheetId: snehaSheet.id,
+        thrustArea: "Relationship Building",
+        title: "Enterprise Client Feedback Loop",
+        description: "Conduct monthly sync calls with core partners.",
+        uomType: UomType.Min,
+        target: "3",
+        weightage: 40,
+        status: GoalStatus.Draft,
+        isShared: true,
+        isLocked: false
+      }
+    ]
+  });
+
+  const arjunSheet = await prisma.goalSheet.create({
+    data: {
+      employeeId: employee6.id,
+      cycleYear: 2026,
+      status: GoalSheetStatus.Draft
+    }
+  });
+
+  await prisma.goal.createMany({
+    data: [
+      {
+        goalSheetId: arjunSheet.id,
+        thrustArea: "Operational Efficiency",
+        title: "Logistics Optimization KPI",
+        description: "Reduce transit delay events and optimize carrier schedules.",
+        uomType: UomType.Min,
+        target: "15",
+        weightage: 50,
+        status: GoalStatus.Draft,
+        isShared: false,
+        isLocked: false
+      },
+      {
+        goalSheetId: arjunSheet.id,
+        thrustArea: "Compliance",
+        title: "Safety Audits Review TAT",
+        description: "Review and close reportable facility audits within 48 hours.",
+        uomType: UomType.Max,
+        target: "48",
+        weightage: 50,
+        status: GoalStatus.Draft,
+        isShared: true,
+        isLocked: false
+      }
+    ]
+  });
+
   // 4. Seed Audit Logs (To populate the Admin Audit Trail Dashboard)
   console.info("Seeding highly detailed Audit logs history...");
   await prisma.auditLog.createMany({
@@ -406,7 +562,7 @@ async function main() {
         fieldChanged: "isOpen",
         oldValue: "true",
         newValue: "false",
-        changeDescription: "Avery Admin closed the Q1 performance appraisal window.",
+        changeDescription: "Rahul Singhania closed the Q1 performance appraisal window.",
         changedAt: new Date("2026-04-01T09:00:00Z")
       },
       {
@@ -416,7 +572,7 @@ async function main() {
         fieldChanged: "isOpen",
         oldValue: "false",
         newValue: "true",
-        changeDescription: "Avery Admin opened the Q2 performance appraisal window.",
+        changeDescription: "Rahul Singhania opened the Q2 performance appraisal window.",
         changedAt: new Date("2026-04-01T09:10:00Z")
       },
       {
@@ -426,7 +582,7 @@ async function main() {
         fieldChanged: "status",
         oldValue: "Draft",
         newValue: "Submitted",
-        changeDescription: "Emery Employee submitted the 2026 goal sheet for approval.",
+        changeDescription: "Priya Sharma submitted the 2026 goal sheet for approval.",
         changedAt: new Date("2026-01-05T09:30:00Z")
       },
       {
@@ -436,7 +592,7 @@ async function main() {
         fieldChanged: "status",
         oldValue: "Submitted",
         newValue: "Approved",
-        changeDescription: "Morgan Manager approved Emery Employee's 2026 Goal Sheet.",
+        changeDescription: "Vikram Bose approved Priya Sharma's 2026 Goal Sheet.",
         changedAt: new Date("2026-01-08T14:15:00Z")
       },
       {
@@ -446,7 +602,7 @@ async function main() {
         fieldChanged: "status",
         oldValue: "Draft",
         newValue: "Submitted",
-        changeDescription: "Rowan Reporter submitted the 2026 goal sheet with balanced weightages.",
+        changeDescription: "Rohan Mehta submitted the 2026 goal sheet with balanced weightages.",
         changedAt: new Date("2026-05-15T11:45:00Z")
       },
       {
@@ -455,8 +611,8 @@ async function main() {
         changedBy: manager.id,
         fieldChanged: "comment",
         oldValue: null,
-        newValue: "Emery had a spectacular Q1...",
-        changeDescription: "Morgan Manager completed Emery Employee's quarterly check-in for Q1.",
+        newValue: "Priya had a spectacular Q1...",
+        changeDescription: "Vikram Bose completed Priya Sharma's quarterly check-in for Q1.",
         changedAt: new Date("2026-04-10T16:20:00Z")
       }
     ]
@@ -467,20 +623,20 @@ async function main() {
   await prisma.escalation.createMany({
     data: [
       {
-        userId: employee3.id, // Casey Contributor (Ops)
+        userId: employee3.id,
         type: "GoalSheetSubmissionPending",
         status: "Escalated",
         triggeredAt: new Date("2026-05-10T08:00:00Z"),
-        note: "SYSTEM TRIGGERED: Casey Contributor failed to submit draft goals within the cycle timeline."
+        note: "SYSTEM TRIGGERED: Ananya Iyer failed to submit draft goals within the cycle timeline."
       },
       {
-        userId: employee2.id, // Rowan Reporter (Revenue)
+        userId: employee2.id,
         type: "QuarterlyCheckInMissing",
         status: "Resolved",
         triggeredAt: new Date("2026-04-05T08:00:00Z"),
         resolvedAt: new Date("2026-04-12T15:30:00Z"),
         resolvedBy: admin.id,
-        note: "System escalated Rowan Reporter's missing Q1 Check-In. Resolved manually after review."
+        note: "System escalated Rohan Mehta's missing Q1 Check-In. Resolved manually after review."
       }
     ]
   });
@@ -491,7 +647,7 @@ async function main() {
     data: [
       {
         userId: manager.id,
-        message: "Action Required: Rowan Reporter has submitted a Goal Sheet for your review.",
+        message: "Action Required: Rohan Mehta has submitted a Goal Sheet for your review.",
         isRead: false,
         createdAt: new Date("2026-05-15T11:45:00Z")
       },
@@ -514,11 +670,11 @@ async function main() {
   console.info("🎉 SUPABASE DATABASE POPULATION SUCCESSFUL!");
   console.info("==============================================");
   console.info("Seeded live demo roles and logins:");
-  console.info(`1. Admin:    admin@atomquest.com    /  ${demoPassword} (Avery Admin)`);
-  console.info(`2. Manager:  manager@atomquest.com  /  ${demoPassword} (Morgan Manager)`);
-  console.info(`3. Employee: employee@atomquest.com /  ${demoPassword} (Emery Employee) -- Approved Goals & Q1/Q2 Data`);
-  console.info(`4. Employee: rowan@atomquest.com    /  ${demoPassword} (Rowan Reporter) -- Submitted & Pending Approval`);
-  console.info(`5. Employee: casey@atomquest.com    /  ${demoPassword} (Casey Contributor) -- Active Draft Status & Escalated`);
+  console.info(`1. Admin:    admin@atomquest.com    /  ${demoPassword} (Rahul Singhania)`);
+  console.info(`2. Manager:  manager@atomquest.com  /  ${demoPassword} (Vikram Bose)`);
+  console.info(`3. Employee: employee@atomquest.com /  ${demoPassword} (Priya Sharma) -- Approved Goals & Q1/Q2 Data`);
+  console.info(`4. Employee: rohan@atomquest.com    /  ${demoPassword} (Rohan Mehta) -- Submitted & Pending Approval`);
+  console.info(`5. Employee: ananya@atomquest.com   /  ${demoPassword} (Ananya Iyer) -- Active Draft Status & Escalated`);
   console.info("==============================================\n");
 }
 
