@@ -59,6 +59,10 @@ checkInsRouter.get("/team/:managerId/:quarter", requireAuth, requireRole("Manage
 
 checkInsRouter.post("/", requireAuth, requireRole("Manager"), async (req, res) => {
   try {
+    if (req.user.sub?.startsWith("demo-")) {
+      const demoCheckIn = demoStore.submitCheckIn({ managerId: req.user.sub, ...req.body });
+      return res.status(201).json({ checkIn: demoCheckIn });
+    }
     const { goalSheetId, quarter, comment, isCompleted } = req.body;
     const sheet = await prisma.goalSheet.findUnique({ where: { id: goalSheetId }, include: { employee: true } });
 

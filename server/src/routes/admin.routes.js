@@ -118,6 +118,11 @@ adminRouter.get("/goals", requireAuth, requireRole("Admin"), async (req, res) =>
 
 adminRouter.post("/unlock-goal/:goalId", requireAuth, requireRole("Admin"), async (req, res) => {
   try {
+    if (req.user.sub?.startsWith("demo-")) {
+      const demoGoal = demoStore.unlockGoal(req.params.goalId, req.user.sub);
+      if (!demoGoal) return res.status(404).json({ message: "Goal not found" });
+      return res.json({ goal: demoGoal });
+    }
     const goal = await prisma.goal.findUnique({ where: { id: req.params.goalId } });
     if (!goal) return res.status(404).json({ message: "Goal not found" });
     await prisma.auditLog.create({
@@ -147,6 +152,11 @@ adminRouter.post("/unlock-goal/:goalId", requireAuth, requireRole("Admin"), asyn
 
 adminRouter.put("/goal/:goalId", requireAuth, requireRole("Manager", "Admin"), async (req, res) => {
   try {
+    if (req.user.sub?.startsWith("demo-")) {
+      const demoGoal = demoStore.editGoal(req.params.goalId, req.body, req.user.sub);
+      if (!demoGoal) return res.status(404).json({ message: "Goal not found" });
+      return res.json({ goal: demoGoal });
+    }
     const goal = await prisma.goal.findUnique({ where: { id: req.params.goalId } });
     if (!goal) return res.status(404).json({ message: "Goal not found" });
 

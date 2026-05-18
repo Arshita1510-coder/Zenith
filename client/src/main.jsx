@@ -1307,9 +1307,14 @@ function ManagerDashboard({ user, onLogout, onSwitchRole, darkMode, setDarkMode,
   }
 
   async function saveTarget(goal) {
-    await api(`/api/admin/goal/${goal.id}`, { method: "PUT", body: JSON.stringify({ target: targetEdits[goal.id] }) });
-    await loadTeam();
-    setMessage(`${goal.title} target updated for approval review.`);
+    try {
+      setMessage("");
+      await api(`/api/admin/goal/${goal.id}`, { method: "PUT", body: JSON.stringify({ target: targetEdits[goal.id] }) });
+      await loadTeam();
+      setMessage(`${goal.title} target updated for approval review.`);
+    } catch (e) {
+      setMessage(`Failed to save target: ${e.message}`);
+    }
   }
 
   const total = team?.reportees.reduce((count, report) => count + report.summary.totalGoals, 0) || 0;
