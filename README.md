@@ -12,7 +12,7 @@
 
 **Zenith** is a premium, enterprise-grade Performance Alignment portal that seamlessly bridges the gap between annual corporate OKR setting, quarterly manager-employee check-in reviews, and leadership governance.
 
-[✨ Live Demo Link](https://github.com/Arshita1510-coder/Zenith) · [🐞 Report Bug](https://github.com/Arshita1510-coder/Zenith/issues) · [💡 Request Feature](https://github.com/Arshita1510-coder/Zenith/issues)
+[✨ Live Demo Link](https://zenith-mu-khaki.vercel.app/) · [🐞 Report Bug](https://github.com/Arshita1510-coder/Zenith/issues) · [💡 Request Feature](https://github.com/Arshita1510-coder/Zenith/issues)
 
 </div>
 
