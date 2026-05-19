@@ -18,6 +18,28 @@
 
 ---
 
+## 📸 Product Showcases & Dashboards
+
+Here is a visual walkthrough of the Zenith Performance Alignment & Analytics Portal:
+
+### 🔑 Sleek Login Portal
+The gateway to Zenith. Users can experience the dynamic role selection with one click.
+![Zenith Login Page](docs/screenshots/login.png)
+
+### 📈 Employee Lifecycle Dashboard
+Designed for maximum productivity. Employees can draft goals, balance weightages, track milestones, and log achievements in real time.
+![Zenith Employee Dashboard](docs/screenshots/employee_dashboard.png)
+
+### 👥 Manager Governance Console
+Enables seamless review cycles. Managers can update team targets, check-in, and approve/return goal sheets.
+![Zenith Manager Dashboard](docs/screenshots/manager_dashboard.png)
+
+### 🛡️ Administrative Control Tower
+Complete cycle control. Admin can toggle quarter windows, reassign organizational pathways, and review live audit trails and Recharts analytics.
+![Zenith Admin Dashboard](docs/screenshots/admin_dashboard.png)
+
+---
+
 ## 📖 The Problem & The Solution
 
 ### **The Problem**

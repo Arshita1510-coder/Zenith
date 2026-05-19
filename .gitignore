@@ -9,3 +9,4 @@ server/server.err.log
 npm-debug.log*
 *.log
 *.png
+!docs/screenshots/*.png
