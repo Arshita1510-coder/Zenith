@@ -18,7 +18,7 @@
 
 ---
 
-## 📸 Product Showcases & Dashboards
+## 📸 Screenshots
 
 Here is a visual walkthrough of the Zenith Performance Alignment & Analytics Portal:
 
